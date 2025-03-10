@@ -1,7 +1,11 @@
 
-import React from 'react';
-import AuthLayout from '../../components/layout/AuthLayout';
-import LoginForm from '../../components/auth/LoginForm';
+import React, { useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import { toast } from 'sonner';
+import { motion } from 'framer-motion';
+import { supabase } from '@/integrations/supabase/client';
+import AuthLayout from '@/components/layout/AuthLayout';
+import LoginForm from '@/components/auth/LoginForm';
 
 const Login = () => {
   return (
