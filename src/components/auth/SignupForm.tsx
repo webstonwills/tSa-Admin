@@ -1,21 +1,28 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { toast } from 'sonner';
+import { Loader2, Building, User, Mail, Lock } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
 
 const departments = [
-  { id: 'ceo', name: 'CEO Office' },
-  { id: 'finance', name: 'Finance' },
-  { id: 'treasurer', name: 'Treasurer' },
-  { id: 'audit', name: 'Audit' },
-  { id: 'hr', name: 'HR' },
-  { id: 'operations', name: 'Operations' },
-  { id: 'marketing', name: 'Marketing' },
+  { id: 'ceo', name: 'CEO Office', code: 'CEO' },
+  { id: 'tre', name: 'Treasurer', code: 'TRE' },
+  { id: 'aud', name: 'Auditor', code: 'AUD' },
+  { id: 'sec', name: 'Secretary', code: 'SEC' },
+  { id: 'bm', name: 'Business Manager', code: 'BM' },
+  { id: 'gm', name: 'General Member', code: 'GM' },
+  { id: 'fin', name: 'Finance', code: 'FIN' },
+  { id: 'trs', name: 'Treasury', code: 'TRS' },
+  { id: 'hr', name: 'HR', code: 'HR' },
+  { id: 'ops', name: 'Operations', code: 'OPS' },
+  { id: 'mkt', name: 'Marketing', code: 'MKT' },
 ];
 
 const SignupForm: React.FC = () => {
-  const [fullName, setFullName] = useState('');
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -26,11 +33,14 @@ const SignupForm: React.FC = () => {
   
   // Generate a random department ID
   const generateDepartmentId = () => {
-    const randomId = Math.random().toString(36).substring(2, 10).toUpperCase();
-    setDepartmentId(`${department.toUpperCase()}-${randomId}`);
+    const selectedDept = departments.find(dept => dept.id === department);
+    if (selectedDept) {
+      const randomId = Math.random().toString(36).substring(2, 6).toUpperCase();
+      setDepartmentId(`${selectedDept.code}-${randomId}`);
+    }
   };
 
-  React.useEffect(() => {
+  useEffect(() => {
     if (department) {
       generateDepartmentId();
     }
@@ -39,7 +49,7 @@ const SignupForm: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!fullName || !email || !password || !confirmPassword || !department) {
+    if (!firstName || !lastName || !email || !password || !confirmPassword || !department) {
       toast.error('Please fill in all fields');
       return;
     }
@@ -49,41 +59,179 @@ const SignupForm: React.FC = () => {
       return;
     }
     
+    if (password.length < 6) {
+      toast.error('Password must be at least 6 characters long');
+      return;
+    }
+    
     setIsLoading(true);
     
-    // Simulate API call
-    setTimeout(() => {
+    try {
+      // Step 1: Create the department in Supabase if it doesn't exist
+      const selectedDept = departments.find(dept => dept.id === department);
+      
+      if (!selectedDept) {
+        toast.error('Invalid department selected');
+        setIsLoading(false);
+        return;
+      }
+      
+      // Check if the department code exists
+      const { data: existingDept, error: deptCheckError } = await supabase
+        .from('departments')
+        .select('id')
+        .eq('department_code', departmentId.split('-')[0])
+        .maybeSingle();
+      
+      let departmentDbId;
+      
+      if (deptCheckError) {
+        console.error('Error checking department:', deptCheckError);
+        toast.error('Error checking department');
+        setIsLoading(false);
+        return;
+      }
+      
+      if (!existingDept) {
+        // Create the department
+        const { data: newDept, error: createDeptError } = await supabase
+          .from('departments')
+          .insert({
+            name: selectedDept.name,
+            department_code: departmentId.split('-')[0],
+          })
+          .select('id')
+          .single();
+        
+        if (createDeptError) {
+          console.error('Error creating department:', createDeptError);
+          toast.error('Error creating department');
+          setIsLoading(false);
+          return;
+        }
+        
+        departmentDbId = newDept.id;
+      } else {
+        departmentDbId = existingDept.id;
+      }
+      
+      // Step 2: Sign up the user with Supabase Auth
+      const { data: authData, error: authError } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: {
+            first_name: firstName,
+            last_name: lastName,
+            department_id: departmentDbId,
+            department_code: departmentId,
+          },
+        },
+      });
+      
+      if (authError) {
+        console.error('Auth error:', authError);
+        toast.error(authError.message);
+        setIsLoading(false);
+        return;
+      }
+      
+      // Step 3: Update the user's profile with additional information
+      if (authData?.user) {
+        const { error: profileError } = await supabase
+          .from('profiles')
+          .update({
+            first_name: firstName,
+            last_name: lastName,
+            department_id: departmentDbId,
+            role: selectedDept.id.toUpperCase(),
+          })
+          .eq('id', authData.user.id);
+        
+        if (profileError) {
+          console.error('Profile update error:', profileError);
+          toast.error('Error updating profile');
+          setIsLoading(false);
+          return;
+        }
+
+        // Step 4: Log the signup event in the audit logs
+        await supabase.rpc('log_audit_event', {
+          action: 'SIGNUP',
+          entity_type: 'USER',
+          entity_id: authData.user.id,
+          details: JSON.stringify({
+            email: email,
+            department_code: departmentId,
+            department_id: departmentDbId
+          })
+        });
+        
+        toast.success('Account created successfully! Please check your email to verify your account.');
+        navigate('/auth/login');
+      }
+    } catch (error) {
+      console.error('Signup error:', error);
+      toast.error('An unexpected error occurred');
+    } finally {
       setIsLoading(false);
-      toast.success('Account created successfully! Please check your email to verify your account.');
-      navigate('/auth/login');
-    }, 1500);
+    }
   };
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
-      <div>
-        <label htmlFor="fullName" className="block text-sm font-medium text-gray-700">
-          Full Name
-        </label>
-        <div className="mt-1">
-          <input
-            id="fullName"
-            name="fullName"
-            type="text"
-            required
-            value={fullName}
-            onChange={(e) => setFullName(e.target.value)}
-            className="block w-full appearance-none rounded-md border border-gray-300 px-3 py-2 placeholder-gray-400 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm"
-            placeholder="Enter your full name"
-          />
+      <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
+        <div>
+          <label htmlFor="firstName" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+            First Name
+          </label>
+          <div className="mt-1 relative">
+            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+              <User className="h-5 w-5 text-gray-400" />
+            </div>
+            <input
+              id="firstName"
+              name="firstName"
+              type="text"
+              required
+              value={firstName}
+              onChange={(e) => setFirstName(e.target.value)}
+              className="block w-full pl-10 appearance-none rounded-md border border-gray-300 px-3 py-2 placeholder-gray-400 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm dark:bg-gray-800 dark:border-gray-700 dark:text-white"
+              placeholder="Enter your first name"
+            />
+          </div>
+        </div>
+
+        <div>
+          <label htmlFor="lastName" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+            Last Name
+          </label>
+          <div className="mt-1 relative">
+            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+              <User className="h-5 w-5 text-gray-400" />
+            </div>
+            <input
+              id="lastName"
+              name="lastName"
+              type="text"
+              required
+              value={lastName}
+              onChange={(e) => setLastName(e.target.value)}
+              className="block w-full pl-10 appearance-none rounded-md border border-gray-300 px-3 py-2 placeholder-gray-400 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm dark:bg-gray-800 dark:border-gray-700 dark:text-white"
+              placeholder="Enter your last name"
+            />
+          </div>
         </div>
       </div>
 
       <div>
-        <label htmlFor="email" className="block text-sm font-medium text-gray-700">
+        <label htmlFor="email" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
           Email address
         </label>
-        <div className="mt-1">
+        <div className="mt-1 relative">
+          <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+            <Mail className="h-5 w-5 text-gray-400" />
+          </div>
           <input
             id="email"
             name="email"
@@ -92,24 +240,27 @@ const SignupForm: React.FC = () => {
             required
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            className="block w-full appearance-none rounded-md border border-gray-300 px-3 py-2 placeholder-gray-400 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm"
+            className="block w-full pl-10 appearance-none rounded-md border border-gray-300 px-3 py-2 placeholder-gray-400 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm dark:bg-gray-800 dark:border-gray-700 dark:text-white"
             placeholder="Enter your email"
           />
         </div>
       </div>
 
       <div>
-        <label htmlFor="department" className="block text-sm font-medium text-gray-700">
+        <label htmlFor="department" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
           Department
         </label>
-        <div className="mt-1">
+        <div className="mt-1 relative">
+          <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+            <Building className="h-5 w-5 text-gray-400" />
+          </div>
           <select
             id="department"
             name="department"
             required
             value={department}
             onChange={(e) => setDepartment(e.target.value)}
-            className="block w-full appearance-none rounded-md border border-gray-300 px-3 py-2 placeholder-gray-400 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm"
+            className="block w-full pl-10 appearance-none rounded-md border border-gray-300 px-3 py-2 placeholder-gray-400 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm dark:bg-gray-800 dark:border-gray-700 dark:text-white"
           >
             <option value="">Select department</option>
             {departments.map((dept) => (
@@ -123,17 +274,20 @@ const SignupForm: React.FC = () => {
 
       {department && (
         <div>
-          <label htmlFor="departmentId" className="block text-sm font-medium text-gray-700">
+          <label htmlFor="departmentId" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
             Department ID (Auto-generated)
           </label>
           <div className="mt-1 relative">
+            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+              <Building className="h-5 w-5 text-gray-400" />
+            </div>
             <input
               id="departmentId"
               name="departmentId"
               type="text"
               readOnly
               value={departmentId}
-              className="block w-full appearance-none rounded-md border border-gray-300 bg-gray-50 px-3 py-2 text-gray-600 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm"
+              className="block w-full pl-10 appearance-none rounded-md border border-gray-300 bg-gray-50 px-3 py-2 text-gray-600 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm dark:bg-gray-800 dark:border-gray-700 dark:text-gray-400"
             />
             <button
               type="button"
@@ -152,10 +306,13 @@ const SignupForm: React.FC = () => {
       )}
 
       <div>
-        <label htmlFor="password" className="block text-sm font-medium text-gray-700">
+        <label htmlFor="password" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
           Password
         </label>
-        <div className="mt-1">
+        <div className="mt-1 relative">
+          <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+            <Lock className="h-5 w-5 text-gray-400" />
+          </div>
           <input
             id="password"
             name="password"
@@ -164,17 +321,20 @@ const SignupForm: React.FC = () => {
             required
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            className="block w-full appearance-none rounded-md border border-gray-300 px-3 py-2 placeholder-gray-400 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm"
+            className="block w-full pl-10 appearance-none rounded-md border border-gray-300 px-3 py-2 placeholder-gray-400 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm dark:bg-gray-800 dark:border-gray-700 dark:text-white"
             placeholder="Create a password"
           />
         </div>
       </div>
 
       <div>
-        <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700">
+        <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
           Confirm Password
         </label>
-        <div className="mt-1">
+        <div className="mt-1 relative">
+          <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+            <Lock className="h-5 w-5 text-gray-400" />
+          </div>
           <input
             id="confirmPassword"
             name="confirmPassword"
@@ -183,7 +343,7 @@ const SignupForm: React.FC = () => {
             required
             value={confirmPassword}
             onChange={(e) => setConfirmPassword(e.target.value)}
-            className="block w-full appearance-none rounded-md border border-gray-300 px-3 py-2 placeholder-gray-400 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm"
+            className="block w-full pl-10 appearance-none rounded-md border border-gray-300 px-3 py-2 placeholder-gray-400 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm dark:bg-gray-800 dark:border-gray-700 dark:text-white"
             placeholder="Confirm your password"
           />
         </div>
@@ -201,18 +361,15 @@ const SignupForm: React.FC = () => {
           }`}
         >
           {isLoading ? (
-            <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-            </svg>
+            <Loader2 className="animate-spin h-5 w-5 mr-2" />
           ) : null}
           {isLoading ? 'Creating account...' : 'Create account'}
         </motion.button>
       </div>
 
       <div className="text-center text-sm">
-        <span className="text-gray-600">Already have an account?</span>{' '}
-        <Link to="/auth/login" className="font-medium text-blue-600 hover:text-blue-500">
+        <span className="text-gray-600 dark:text-gray-400">Already have an account?</span>{' '}
+        <Link to="/auth/login" className="font-medium text-blue-600 hover:text-blue-500 dark:text-blue-400">
           Sign in
         </Link>
       </div>

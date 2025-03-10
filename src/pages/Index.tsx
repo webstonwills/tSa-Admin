@@ -6,7 +6,6 @@ import { motion } from 'framer-motion';
 const Index = () => {
   return (
     <div className="min-h-screen flex flex-col">
-      {/* Header */}
       <header className="bg-white glass-morphism shadow-sm">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="flex h-16 justify-between">
@@ -17,7 +16,9 @@ const Index = () => {
                     AF
                   </div>
                 </div>
-                <span className="ml-3 text-xl font-semibold text-gray-900">Admin Finance</span>
+                <span className="ml-3 text-xl font-semibold text-gray-900">
+                  Admin Finance
+                </span>
               </div>
             </div>
             <div className="flex items-center">
@@ -32,15 +33,14 @@ const Index = () => {
         </div>
       </header>
 
-      {/* Hero section */}
       <div className="flex-grow flex flex-col items-center justify-center bg-gradient-to-br from-blue-50 to-gray-50 px-4 py-12 sm:px-6 lg:px-8">
-        <motion.div 
+        <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6 }}
           className="text-center max-w-3xl"
         >
-          <motion.div 
+          <motion.div
             initial={{ scale: 0.9, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
             transition={{ duration: 0.5, delay: 0.2 }}
@@ -50,8 +50,8 @@ const Index = () => {
               AF
             </div>
           </motion.div>
-          
-          <motion.h1 
+
+          <motion.h1
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ delay: 0.4, duration: 0.6 }}
@@ -60,8 +60,8 @@ const Index = () => {
             <span className="block">Admin Finance Hub</span>
             <span className="block text-blue-600">Multi-Role Administration</span>
           </motion.h1>
-          
-          <motion.p 
+
+          <motion.p
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ delay: 0.6, duration: 0.6 }}
@@ -69,8 +69,8 @@ const Index = () => {
           >
             A financial-grade administrative system with role-based access control, secure authentication, and professional dashboards for all departments.
           </motion.p>
-          
-          <motion.div 
+
+          <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ delay: 0.8, duration: 0.6 }}
@@ -92,7 +92,6 @@ const Index = () => {
         </motion.div>
       </div>
 
-      {/* Features section */}
       <div className="bg-white py-16 sm:py-24">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="text-center">
@@ -108,21 +107,25 @@ const Index = () => {
           <div className="mt-16">
             <dl className="space-y-10 md:grid md:grid-cols-2 md:gap-x-8 md:gap-y-10 md:space-y-0">
               {features.map((feature) => (
-                <motion.div 
+                <motion.div
+                  key={feature.name}
                   initial={{ opacity: 0, y: 20 }}
                   whileInView={{ opacity: 1, y: 0 }}
                   viewport={{ once: true }}
                   transition={{ duration: 0.5 }}
-                  key={feature.name} 
                   className="relative"
                 >
                   <dt>
                     <div className="absolute flex h-12 w-12 items-center justify-center rounded-md bg-blue-500 text-white">
                       <feature.icon className="h-6 w-6" aria-hidden="true" />
                     </div>
-                    <p className="ml-16 text-lg font-medium leading-6 text-gray-900">{feature.name}</p>
+                    <p className="ml-16 text-lg font-medium leading-6 text-gray-900">
+                      {feature.name}
+                    </p>
                   </dt>
-                  <dd className="mt-2 ml-16 text-base text-gray-500">{feature.description}</dd>
+                  <dd className="mt-2 ml-16 text-base text-gray-500">
+                    {feature.description}
+                  </dd>
                 </motion.div>
               ))}
             </dl>
@@ -130,7 +133,6 @@ const Index = () => {
         </div>
       </div>
 
-      {/* Footer */}
       <footer className="bg-white glass-morphism">
         <div className="mx-auto max-w-7xl py-12 px-4 sm:px-6 md:flex md:items-center md:justify-between lg:px-8">
           <div className="flex justify-center space-x-6 md:order-2">

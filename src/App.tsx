@@ -1,4 +1,3 @@
-
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -7,6 +6,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
 import Login from "./pages/Auth/Login";
+import Signup from "./pages/Auth/Signup";
 import { AuthProvider } from "./components/auth/AuthContext";
 import ProtectedRoute from "./components/auth/ProtectedRoute";
 
@@ -22,6 +22,7 @@ const App = () => (
           <Routes>
             <Route path="/" element={<Index />} />
             <Route path="/auth/login" element={<Login />} />
+            <Route path="/auth/signup" element={<Signup />} />
             
             {/* Protected Dashboard Routes */}
             <Route path="/dashboard/ceo" element={
@@ -33,6 +34,52 @@ const App = () => (
               </ProtectedRoute>
             } />
             
+            <Route path="/dashboard/tre" element={
+              <ProtectedRoute>
+                <div className="p-8">
+                  <h1 className="text-2xl font-bold">Treasurer Dashboard</h1>
+                  <p className="mt-4">Your Treasurer dashboard will appear here.</p>
+                </div>
+              </ProtectedRoute>
+            } />
+            
+            <Route path="/dashboard/aud" element={
+              <ProtectedRoute>
+                <div className="p-8">
+                  <h1 className="text-2xl font-bold">Auditor Dashboard</h1>
+                  <p className="mt-4">Your Auditor dashboard will appear here.</p>
+                </div>
+              </ProtectedRoute>
+            } />
+            
+            <Route path="/dashboard/sec" element={
+              <ProtectedRoute>
+                <div className="p-8">
+                  <h1 className="text-2xl font-bold">Secretary Dashboard</h1>
+                  <p className="mt-4">Your Secretary dashboard will appear here.</p>
+                </div>
+              </ProtectedRoute>
+            } />
+            
+            <Route path="/dashboard/bm" element={
+              <ProtectedRoute>
+                <div className="p-8">
+                  <h1 className="text-2xl font-bold">Business Manager Dashboard</h1>
+                  <p className="mt-4">Your Business Manager dashboard will appear here.</p>
+                </div>
+              </ProtectedRoute>
+            } />
+            
+            <Route path="/dashboard/gm" element={
+              <ProtectedRoute>
+                <div className="p-8">
+                  <h1 className="text-2xl font-bold">General Member Dashboard</h1>
+                  <p className="mt-4">Your General Member dashboard will appear here.</p>
+                </div>
+              </ProtectedRoute>
+            } />
+            
+            {/* Keep the existing routes */}
             <Route path="/dashboard/fin" element={
               <ProtectedRoute>
                 <div className="p-8">
@@ -47,15 +94,6 @@ const App = () => (
                 <div className="p-8">
                   <h1 className="text-2xl font-bold">Treasury Dashboard</h1>
                   <p className="mt-4">Your Treasury dashboard will appear here.</p>
-                </div>
-              </ProtectedRoute>
-            } />
-            
-            <Route path="/dashboard/aud" element={
-              <ProtectedRoute>
-                <div className="p-8">
-                  <h1 className="text-2xl font-bold">Audit Dashboard</h1>
-                  <p className="mt-4">Your Audit dashboard will appear here.</p>
                 </div>
               </ProtectedRoute>
             } />
