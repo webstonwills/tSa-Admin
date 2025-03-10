@@ -7,6 +7,8 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
 import Login from "./pages/Auth/Login";
+import { AuthProvider } from "./components/auth/AuthContext";
+import ProtectedRoute from "./components/auth/ProtectedRoute";
 
 const queryClient = new QueryClient();
 
@@ -16,12 +18,79 @@ const App = () => (
       <Toaster />
       <Sonner />
       <BrowserRouter>
-        <Routes>
-          <Route path="/" element={<Index />} />
-          <Route path="/auth/login" element={<Login />} />
-          {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-          <Route path="*" element={<NotFound />} />
-        </Routes>
+        <AuthProvider>
+          <Routes>
+            <Route path="/" element={<Index />} />
+            <Route path="/auth/login" element={<Login />} />
+            
+            {/* Protected Dashboard Routes */}
+            <Route path="/dashboard/ceo" element={
+              <ProtectedRoute>
+                <div className="p-8">
+                  <h1 className="text-2xl font-bold">CEO Dashboard</h1>
+                  <p className="mt-4">Your CEO dashboard will appear here.</p>
+                </div>
+              </ProtectedRoute>
+            } />
+            
+            <Route path="/dashboard/fin" element={
+              <ProtectedRoute>
+                <div className="p-8">
+                  <h1 className="text-2xl font-bold">Finance Dashboard</h1>
+                  <p className="mt-4">Your Finance dashboard will appear here.</p>
+                </div>
+              </ProtectedRoute>
+            } />
+            
+            <Route path="/dashboard/trs" element={
+              <ProtectedRoute>
+                <div className="p-8">
+                  <h1 className="text-2xl font-bold">Treasury Dashboard</h1>
+                  <p className="mt-4">Your Treasury dashboard will appear here.</p>
+                </div>
+              </ProtectedRoute>
+            } />
+            
+            <Route path="/dashboard/aud" element={
+              <ProtectedRoute>
+                <div className="p-8">
+                  <h1 className="text-2xl font-bold">Audit Dashboard</h1>
+                  <p className="mt-4">Your Audit dashboard will appear here.</p>
+                </div>
+              </ProtectedRoute>
+            } />
+            
+            <Route path="/dashboard/hr" element={
+              <ProtectedRoute>
+                <div className="p-8">
+                  <h1 className="text-2xl font-bold">HR Dashboard</h1>
+                  <p className="mt-4">Your HR dashboard will appear here.</p>
+                </div>
+              </ProtectedRoute>
+            } />
+            
+            <Route path="/dashboard/ops" element={
+              <ProtectedRoute>
+                <div className="p-8">
+                  <h1 className="text-2xl font-bold">Operations Dashboard</h1>
+                  <p className="mt-4">Your Operations dashboard will appear here.</p>
+                </div>
+              </ProtectedRoute>
+            } />
+            
+            <Route path="/dashboard/mkt" element={
+              <ProtectedRoute>
+                <div className="p-8">
+                  <h1 className="text-2xl font-bold">Marketing Dashboard</h1>
+                  <p className="mt-4">Your Marketing dashboard will appear here.</p>
+                </div>
+              </ProtectedRoute>
+            } />
+            
+            {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+            <Route path="*" element={<NotFound />} />
+          </Routes>
+        </AuthProvider>
       </BrowserRouter>
     </TooltipProvider>
   </QueryClientProvider>

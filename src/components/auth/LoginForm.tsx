@@ -23,36 +23,78 @@ const LoginForm: React.FC = () => {
     
     setIsLoading(true);
     
-    // Simulate API call
-    setTimeout(() => {
-      setIsLoading(false);
+    try {
+      // First, check if the department code is valid
+      const { data: departmentData, error: departmentError } = await supabase
+        .from('departments')
+        .select('id')
+        .eq('department_code', departmentId.toUpperCase())
+        .single();
       
-      // Mock login logic for demo - in real app this would check against Supabase
-      if (email === 'ceo@example.com' && password === 'password') {
-        toast.success('Login successful');
-        navigate('/dashboard/ceo');
-      } else if (email === 'finance@example.com' && password === 'password') {
-        toast.success('Login successful');
-        navigate('/dashboard/finance');
-      } else if (email === 'treasurer@example.com' && password === 'password') {
-        toast.success('Login successful');
-        navigate('/dashboard/treasurer');
-      } else if (email === 'audit@example.com' && password === 'password') {
-        toast.success('Login successful');
-        navigate('/dashboard/audit');
-      } else if (email === 'hr@example.com' && password === 'password') {
-        toast.success('Login successful');
-        navigate('/dashboard/hr');
-      } else if (email === 'operations@example.com' && password === 'password') {
-        toast.success('Login successful');
-        navigate('/dashboard/operations');
-      } else if (email === 'marketing@example.com' && password === 'password') {
-        toast.success('Login successful');
-        navigate('/dashboard/marketing');
-      } else {
-        toast.error('Invalid credentials');
+      if (departmentError || !departmentData) {
+        toast.error('Invalid department ID');
+        setIsLoading(false);
+        return;
       }
-    }, 1500);
+
+      // Try to sign in the user
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+
+      if (error) {
+        toast.error(error.message);
+        setIsLoading(false);
+        return;
+      }
+
+      // Check if user has the correct department in their profile
+      const { data: profileData, error: profileError } = await supabase
+        .from('profiles')
+        .select('department_id, role')
+        .eq('id', data.user.id)
+        .single();
+      
+      if (profileError) {
+        toast.error('Failed to fetch user profile');
+        setIsLoading(false);
+        return;
+      }
+
+      // Update the user's department if not set or if different
+      if (!profileData.department_id || profileData.department_id !== departmentData.id) {
+        const { error: updateError } = await supabase
+          .from('profiles')
+          .update({ department_id: departmentData.id })
+          .eq('id', data.user.id);
+        
+        if (updateError) {
+          toast.error('Failed to update user department');
+          setIsLoading(false);
+          return;
+        }
+      }
+
+      // Log the successful login action
+      await supabase.rpc('log_audit_event', {
+        action: 'LOGIN',
+        entity_type: 'USER',
+        entity_id: data.user.id,
+        details: JSON.stringify({
+          email: email,
+          department_code: departmentId.toUpperCase()
+        })
+      });
+
+      toast.success('Login successful');
+      navigate(`/dashboard/${departmentId.toLowerCase()}`);
+    } catch (error) {
+      toast.error('An unexpected error occurred');
+      console.error('Login error:', error);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -73,7 +115,7 @@ const LoginForm: React.FC = () => {
             value={departmentId}
             onChange={(e) => setDepartmentId(e.target.value)}
             className="block w-full pl-10 appearance-none rounded-md border border-gray-300 px-3 py-2 placeholder-gray-400 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm dark:bg-gray-800 dark:border-gray-700 dark:text-white"
-            placeholder="Enter your department ID"
+            placeholder="Enter your department ID (e.g., CEO, FIN, HR)"
           />
         </div>
       </div>
