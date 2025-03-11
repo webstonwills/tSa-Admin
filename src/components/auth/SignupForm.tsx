@@ -71,13 +71,12 @@ const SignupForm: React.FC = () => {
         return;
       }
       
+      // First check if the department already exists
       const { data: existingDept, error: deptCheckError } = await supabase
         .from('departments')
         .select('id')
         .eq('department_code', selectedDept.code)
         .maybeSingle();
-      
-      let departmentDbId;
       
       if (deptCheckError) {
         console.error('Error checking department:', deptCheckError);
@@ -86,28 +85,39 @@ const SignupForm: React.FC = () => {
         return;
       }
       
+      let departmentDbId;
+      
+      // If department doesn't exist, create it
       if (!existingDept) {
-        const { data: newDept, error: createDeptError } = await supabase
-          .from('departments')
-          .insert({
-            name: selectedDept.name,
-            department_code: selectedDept.code,
-          })
-          .select('id')
-          .single();
-        
-        if (createDeptError) {
-          console.error('Error creating department:', createDeptError);
-          toast.error('Error creating department');
+        try {
+          const { data: newDept, error: createDeptError } = await supabase
+            .from('departments')
+            .insert({
+              name: selectedDept.name,
+              department_code: selectedDept.code,
+            })
+            .select('id')
+            .single();
+          
+          if (createDeptError) {
+            console.error('Error creating department:', createDeptError);
+            toast.error(`Error creating department: ${createDeptError.message}`);
+            setIsLoading(false);
+            return;
+          }
+          
+          departmentDbId = newDept.id;
+        } catch (innerError) {
+          console.error('Exception creating department:', innerError);
+          toast.error(`Exception creating department: ${String(innerError)}`);
           setIsLoading(false);
           return;
         }
-        
-        departmentDbId = newDept.id;
       } else {
         departmentDbId = existingDept.id;
       }
       
+      // Now sign up the user
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email,
         password,
@@ -129,6 +139,7 @@ const SignupForm: React.FC = () => {
       }
       
       if (authData?.user) {
+        // Update the profile information
         const { error: profileError } = await supabase
           .from('profiles')
           .update({
@@ -146,23 +157,29 @@ const SignupForm: React.FC = () => {
           return;
         }
 
-        await supabase.rpc('log_audit_event', {
-          action: 'SIGNUP',
-          entity_type: 'USER',
-          entity_id: authData.user.id,
-          details: JSON.stringify({
-            email: email,
-            department_code: departmentId,
-            department_id: departmentDbId
-          })
-        });
+        // Log the signup in audit logs
+        try {
+          await supabase.rpc('log_audit_event', {
+            action: 'SIGNUP',
+            entity_type: 'USER',
+            entity_id: authData.user.id,
+            details: JSON.stringify({
+              email: email,
+              department_code: departmentId,
+              department_id: departmentDbId
+            })
+          });
+        } catch (auditError) {
+          console.error('Audit log error:', auditError);
+          // Non-blocking error, continue with signup
+        }
         
         toast.success('Account created successfully! Please check your email to verify your account.');
         navigate('/auth/login');
       }
     } catch (error) {
       console.error('Signup error:', error);
-      toast.error('An unexpected error occurred');
+      toast.error(`An unexpected error occurred: ${String(error)}`);
     } finally {
       setIsLoading(false);
     }
