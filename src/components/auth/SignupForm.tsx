@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
@@ -29,8 +30,9 @@ const SignupForm: React.FC = () => {
   const generateDepartmentId = () => {
     const selectedDept = departments.find(dept => dept.id === department);
     if (selectedDept) {
-      const randomId = Math.random().toString(36).substring(2, 6).toUpperCase();
-      setDepartmentId(`${selectedDept.code}-${randomId}`);
+      // Generate a random 3-digit number
+      const randomId = Math.floor(Math.random() * 900 + 100);
+      setDepartmentId(`${selectedDept.code}_${randomId}`);
     }
   };
 
@@ -72,7 +74,7 @@ const SignupForm: React.FC = () => {
       const { data: existingDept, error: deptCheckError } = await supabase
         .from('departments')
         .select('id')
-        .eq('department_code', departmentId.split('-')[0])
+        .eq('department_code', selectedDept.code)
         .maybeSingle();
       
       let departmentDbId;
@@ -89,7 +91,7 @@ const SignupForm: React.FC = () => {
           .from('departments')
           .insert({
             name: selectedDept.name,
-            department_code: departmentId.split('-')[0],
+            department_code: selectedDept.code,
           })
           .select('id')
           .single();

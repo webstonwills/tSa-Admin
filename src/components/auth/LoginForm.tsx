@@ -29,10 +29,10 @@ const LoginForm: React.FC = () => {
     
     try {
       // First, check if the department code is valid
-      const departmentCode = departmentId.split('-')[0]?.toUpperCase();
+      const departmentCode = departmentId.split('_')[0]?.toUpperCase();
       
       if (!departmentCode) {
-        toast.error('Invalid department ID format. Expected format: XXX-1234');
+        toast.error('Invalid department ID format. Expected format: XXX_123');
         setIsLoading(false);
         return;
       }
@@ -130,7 +130,7 @@ const LoginForm: React.FC = () => {
             value={departmentId}
             onChange={(e) => setDepartmentId(e.target.value)}
             className="block w-full pl-10 appearance-none rounded-md border border-gray-300 px-3 py-2 placeholder-gray-400 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm dark:bg-gray-800 dark:border-gray-700 dark:text-white"
-            placeholder="Enter your department ID (e.g., CEO-1234, TRE-5678)"
+            placeholder="Enter your department ID (e.g., CEO_123, FIN_456)"
           />
         </div>
       </div>
