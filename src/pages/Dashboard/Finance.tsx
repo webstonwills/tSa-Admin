@@ -11,7 +11,6 @@ import {
   BarChart,
   PieChart
 } from 'lucide-react';
-import { Line } from 'recharts';
 
 const FinanceDashboard = () => {
   const data = [
@@ -36,23 +35,26 @@ const FinanceDashboard = () => {
         <OverviewCard
           title="Total Revenue"
           value="$125,000"
-          trend="+8.2%"
+          change="+8.2%"
+          isPositive={true}
           icon={<DollarSign className="h-5 w-5" />}
-          trendDescription="vs last month"
+          className=""
         />
         <OverviewCard
           title="Expenses"
           value="$45,000"
-          trend="-2.4%"
+          change="-2.4%"
+          isPositive={false}
           icon={<CreditCard className="h-5 w-5" />}
-          trendDescription="vs last month"
+          className=""
         />
         <OverviewCard
           title="Net Profit"
           value="$80,000"
-          trend="+15.3%"
+          change="+15.3%"
+          isPositive={true}
           icon={<TrendingUp className="h-5 w-5" />}
-          trendDescription="vs last month"
+          className=""
         />
       </div>
 
@@ -60,10 +62,9 @@ const FinanceDashboard = () => {
         <ChartCard
           title="Revenue Overview"
           subtitle="Monthly revenue trends"
+          type="area"
           data={data}
-        >
-          <Line type="monotone" dataKey="value" stroke="#8884d8" />
-        </ChartCard>
+        />
 
         <Card className="p-6">
           <h3 className="text-lg font-semibold mb-4">Financial Updates</h3>

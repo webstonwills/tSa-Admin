@@ -11,7 +11,6 @@ import {
   Activity,
   Award
 } from 'lucide-react';
-import { Line } from 'recharts';
 
 const WelfareDashboard = () => {
   const data = [
@@ -36,23 +35,26 @@ const WelfareDashboard = () => {
         <OverviewCard
           title="Active Programs"
           value="8"
-          trend="+2"
+          change="+2"
+          isPositive={true}
           icon={<Heart className="h-5 w-5" />}
-          trendDescription="this month"
+          className=""
         />
         <OverviewCard
           title="Beneficiaries"
           value="450"
-          trend="+45"
+          change="+45"
+          isPositive={true}
           icon={<Users className="h-5 w-5" />}
-          trendDescription="vs last month"
+          className=""
         />
         <OverviewCard
           title="Satisfaction Rate"
           value="92%"
-          trend="+5%"
+          change="+5%"
+          isPositive={true}
           icon={<Award className="h-5 w-5" />}
-          trendDescription="from survey"
+          className=""
         />
       </div>
 
@@ -60,10 +62,9 @@ const WelfareDashboard = () => {
         <ChartCard
           title="Program Impact"
           subtitle="Monthly beneficiary satisfaction"
+          type="line"
           data={data}
-        >
-          <Line type="monotone" dataKey="value" stroke="#8884d8" />
-        </ChartCard>
+        />
 
         <Card className="p-6">
           <h3 className="text-lg font-semibold mb-4">Ongoing Initiatives</h3>

@@ -11,7 +11,6 @@ import {
   Users,
   BarChart
 } from 'lucide-react';
-import { Line } from 'recharts';
 
 const BusinessManagementDashboard = () => {
   const data = [
@@ -35,23 +34,26 @@ const BusinessManagementDashboard = () => {
         <OverviewCard
           title="Active Projects"
           value="12"
-          trend="+2"
+          change="+2"
+          isPositive={true}
           icon={<Briefcase className="h-5 w-5" />}
-          trendDescription="from last month"
+          className=""
         />
         <OverviewCard
           title="Team Performance"
           value="92%"
-          trend="+5%"
+          change="+5%"
+          isPositive={true}
           icon={<Users className="h-5 w-5" />}
-          trendDescription="vs target"
+          className=""
         />
         <OverviewCard
           title="Goals Achieved"
           value="85%"
-          trend="+8%"
+          change="+8%"
+          isPositive={true}
           icon={<Target className="h-5 w-5" />}
-          trendDescription="this quarter"
+          className=""
         />
       </div>
 
@@ -59,10 +61,9 @@ const BusinessManagementDashboard = () => {
         <ChartCard
           title="Project Performance"
           subtitle="Weekly progress overview"
+          type="line"
           data={data}
-        >
-          <Line type="monotone" dataKey="value" stroke="#8884d8" />
-        </ChartCard>
+        />
 
         <Card className="p-6">
           <h3 className="text-lg font-semibold mb-4">Project Updates</h3>

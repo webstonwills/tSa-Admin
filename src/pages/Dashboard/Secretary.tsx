@@ -11,7 +11,6 @@ import {
   Clock,
   Inbox
 } from 'lucide-react';
-import { Line } from 'recharts';
 
 const SecretaryDashboard = () => {
   const data = [
@@ -36,23 +35,26 @@ const SecretaryDashboard = () => {
         <OverviewCard
           title="Pending Tasks"
           value="8"
-          trend="-2"
+          change="-2"
+          isPositive={false}
           icon={<Clock className="h-5 w-5" />}
-          trendDescription="from yesterday"
+          className=""
         />
         <OverviewCard
           title="Unread Messages"
           value="15"
-          trend="+5"
+          change="+5"
+          isPositive={true}
           icon={<Mail className="h-5 w-5" />}
-          trendDescription="new today"
+          className=""
         />
         <OverviewCard
           title="Completed Tasks"
           value="42"
-          trend="+12"
+          change="+12"
+          isPositive={true}
           icon={<CheckCircle className="h-5 w-5" />}
-          trendDescription="this week"
+          className=""
         />
       </div>
 
@@ -60,10 +62,9 @@ const SecretaryDashboard = () => {
         <ChartCard
           title="Task Completion"
           subtitle="Weekly task completion rate"
+          type="line"
           data={data}
-        >
-          <Line type="monotone" dataKey="value" stroke="#8884d8" />
-        </ChartCard>
+        />
 
         <Card className="p-6">
           <h3 className="text-lg font-semibold mb-4">Today's Schedule</h3>

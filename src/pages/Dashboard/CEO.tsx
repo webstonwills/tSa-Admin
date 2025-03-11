@@ -1,7 +1,6 @@
 
 import React from 'react';
 import { Card } from "@/components/ui/card";
-import { Line } from 'recharts';
 import ChartCard from '@/components/dashboard/ChartCard';
 import OverviewCard from '@/components/dashboard/OverviewCard';
 import { 
@@ -37,23 +36,26 @@ const CEODashboard = () => {
         <OverviewCard
           title="Total Departments"
           value="7"
-          trend="+2"
+          change="+2"
+          isPositive={true}
           icon={<Users className="h-5 w-5" />}
-          trendDescription="from last month"
+          className=""
         />
         <OverviewCard
           title="Revenue Growth"
           value="15.2%"
-          trend="+5.2"
+          change="+5.2"
+          isPositive={true}
           icon={<TrendingUp className="h-5 w-5" />}
-          trendDescription="vs last quarter"
+          className=""
         />
         <OverviewCard
           title="Active Projects"
           value="24"
-          trend="+3"
+          change="+3"
+          isPositive={true}
           icon={<Activity className="h-5 w-5" />}
-          trendDescription="this month"
+          className=""
         />
       </div>
 
@@ -61,10 +63,9 @@ const CEODashboard = () => {
         <ChartCard
           title="Performance Overview"
           subtitle="Monthly performance metrics"
+          type="line"
           data={data}
-        >
-          <Line type="monotone" dataKey="value" stroke="#8884d8" />
-        </ChartCard>
+        />
 
         <Card className="p-6">
           <h3 className="text-lg font-semibold mb-4">Recent Updates</h3>

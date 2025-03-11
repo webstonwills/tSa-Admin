@@ -11,7 +11,6 @@ import {
   CheckSquare,
   Vote
 } from 'lucide-react';
-import { Line } from 'recharts';
 
 const BoardMemberDashboard = () => {
   const data = [
@@ -35,23 +34,26 @@ const BoardMemberDashboard = () => {
         <OverviewCard
           title="Meetings Attended"
           value="15"
-          trend="+3"
+          change="+3"
+          isPositive={true}
           icon={<UserCheck className="h-5 w-5" />}
-          trendDescription="this quarter"
+          className=""
         />
         <OverviewCard
           title="Resolutions Passed"
           value="8"
-          trend="+2"
+          change="+2"
+          isPositive={true}
           icon={<CheckSquare className="h-5 w-5" />}
-          trendDescription="this month"
+          className=""
         />
         <OverviewCard
           title="Pending Reviews"
           value="5"
-          trend="-2"
+          change="-2"
+          isPositive={false}
           icon={<FileText className="h-5 w-5" />}
-          trendDescription="from last week"
+          className=""
         />
       </div>
 
@@ -59,10 +61,9 @@ const BoardMemberDashboard = () => {
         <ChartCard
           title="Board Performance"
           subtitle="Quarterly metrics overview"
+          type="line"
           data={data}
-        >
-          <Line type="monotone" dataKey="value" stroke="#8884d8" />
-        </ChartCard>
+        />
 
         <Card className="p-6">
           <h3 className="text-lg font-semibold mb-4">Upcoming Meetings</h3>

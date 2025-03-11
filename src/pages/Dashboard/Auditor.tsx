@@ -11,7 +11,6 @@ import {
   CheckCircle,
   FileText
 } from 'lucide-react';
-import { Line } from 'recharts';
 
 const AuditorDashboard = () => {
   const data = [
@@ -36,23 +35,26 @@ const AuditorDashboard = () => {
         <OverviewCard
           title="Audits Completed"
           value="28"
-          trend="+5"
+          change="+5"
+          isPositive={true}
           icon={<FileCheck className="h-5 w-5" />}
-          trendDescription="this month"
+          className=""
         />
         <OverviewCard
           title="Pending Reviews"
           value="12"
-          trend="-3"
+          change="-3"
+          isPositive={false}
           icon={<SearchCheck className="h-5 w-5" />}
-          trendDescription="from last week"
+          className=""
         />
         <OverviewCard
           title="Issues Identified"
           value="15"
-          trend="+2"
+          change="+2"
+          isPositive={false}
           icon={<AlertTriangle className="h-5 w-5" />}
-          trendDescription="this week"
+          className=""
         />
       </div>
 
@@ -60,10 +62,9 @@ const AuditorDashboard = () => {
         <ChartCard
           title="Audit Progress"
           subtitle="Monthly audit completion rate"
+          type="bar"
           data={data}
-        >
-          <Line type="monotone" dataKey="value" stroke="#8884d8" />
-        </ChartCard>
+        />
 
         <Card className="p-6">
           <h3 className="text-lg font-semibold mb-4">Recent Audits</h3>
