@@ -3,7 +3,7 @@ import React from 'react';
 import AuthLayout from '@/components/layout/AuthLayout';
 import SignupForm from '@/components/auth/SignupForm';
 import { motion } from 'framer-motion';
-import { Building, ShieldCheck, Lock } from 'lucide-react';
+import { Building, ShieldCheck, Lock, AlertCircle } from 'lucide-react';
 
 const Signup = () => {
   return (
@@ -34,6 +34,24 @@ const Signup = () => {
             </motion.div>
           ))}
         </div>
+        
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.5 }}
+          className="rounded-md bg-blue-50 p-4 dark:bg-blue-900/20"
+        >
+          <div className="flex">
+            <div className="flex-shrink-0">
+              <AlertCircle className="h-5 w-5 text-blue-400" aria-hidden="true" />
+            </div>
+            <div className="ml-3 flex-1 md:flex md:justify-between">
+              <p className="text-sm text-blue-700 dark:text-blue-300">
+                All new accounts require department assignment. Your department ID will be generated automatically.
+              </p>
+            </div>
+          </div>
+        </motion.div>
       </div>
 
       <SignupForm />
