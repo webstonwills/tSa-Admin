@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
@@ -8,16 +7,12 @@ import { supabase } from '@/integrations/supabase/client';
 
 const departments = [
   { id: 'ceo', name: 'CEO Office', code: 'CEO' },
-  { id: 'tre', name: 'Treasurer', code: 'TRE' },
-  { id: 'aud', name: 'Auditor', code: 'AUD' },
   { id: 'sec', name: 'Secretary', code: 'SEC' },
-  { id: 'bm', name: 'Business Manager', code: 'BM' },
-  { id: 'gm', name: 'General Member', code: 'GM' },
   { id: 'fin', name: 'Finance', code: 'FIN' },
-  { id: 'trs', name: 'Treasury', code: 'TRS' },
-  { id: 'hr', name: 'HR', code: 'HR' },
-  { id: 'ops', name: 'Operations', code: 'OPS' },
-  { id: 'mkt', name: 'Marketing', code: 'MKT' },
+  { id: 'bm', name: 'Business Management', code: 'BM' },
+  { id: 'aud', name: 'Auditor', code: 'AUD' },
+  { id: 'wel', name: 'Welfare', code: 'WEL' },
+  { id: 'bmem', name: 'Board Member', code: 'BMEM' },
 ];
 
 const SignupForm: React.FC = () => {
@@ -31,7 +26,6 @@ const SignupForm: React.FC = () => {
   const [departmentId, setDepartmentId] = useState('');
   const navigate = useNavigate();
   
-  // Generate a random department ID
   const generateDepartmentId = () => {
     const selectedDept = departments.find(dept => dept.id === department);
     if (selectedDept) {
@@ -67,7 +61,6 @@ const SignupForm: React.FC = () => {
     setIsLoading(true);
     
     try {
-      // Step 1: Create the department in Supabase if it doesn't exist
       const selectedDept = departments.find(dept => dept.id === department);
       
       if (!selectedDept) {
@@ -76,7 +69,6 @@ const SignupForm: React.FC = () => {
         return;
       }
       
-      // Check if the department code exists
       const { data: existingDept, error: deptCheckError } = await supabase
         .from('departments')
         .select('id')
@@ -93,7 +85,6 @@ const SignupForm: React.FC = () => {
       }
       
       if (!existingDept) {
-        // Create the department
         const { data: newDept, error: createDeptError } = await supabase
           .from('departments')
           .insert({
@@ -115,7 +106,6 @@ const SignupForm: React.FC = () => {
         departmentDbId = existingDept.id;
       }
       
-      // Step 2: Sign up the user with Supabase Auth
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email,
         password,
@@ -136,7 +126,6 @@ const SignupForm: React.FC = () => {
         return;
       }
       
-      // Step 3: Update the user's profile with additional information
       if (authData?.user) {
         const { error: profileError } = await supabase
           .from('profiles')
@@ -155,7 +144,6 @@ const SignupForm: React.FC = () => {
           return;
         }
 
-        // Step 4: Log the signup event in the audit logs
         await supabase.rpc('log_audit_event', {
           action: 'SIGNUP',
           entity_type: 'USER',

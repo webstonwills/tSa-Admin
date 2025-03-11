@@ -34,11 +34,29 @@ const App = () => (
               </ProtectedRoute>
             } />
             
-            <Route path="/dashboard/tre" element={
+            <Route path="/dashboard/sec" element={
               <ProtectedRoute>
                 <div className="p-8">
-                  <h1 className="text-2xl font-bold">Treasurer Dashboard</h1>
-                  <p className="mt-4">Your Treasurer dashboard will appear here.</p>
+                  <h1 className="text-2xl font-bold">Secretary Dashboard</h1>
+                  <p className="mt-4">Your Secretary dashboard will appear here.</p>
+                </div>
+              </ProtectedRoute>
+            } />
+            
+            <Route path="/dashboard/fin" element={
+              <ProtectedRoute>
+                <div className="p-8">
+                  <h1 className="text-2xl font-bold">Finance Dashboard</h1>
+                  <p className="mt-4">Your Finance dashboard will appear here.</p>
+                </div>
+              </ProtectedRoute>
+            } />
+            
+            <Route path="/dashboard/bm" element={
+              <ProtectedRoute>
+                <div className="p-8">
+                  <h1 className="text-2xl font-bold">Business Management Dashboard</h1>
+                  <p className="mt-4">Your Business Management dashboard will appear here.</p>
                 </div>
               </ProtectedRoute>
             } />
@@ -52,39 +70,30 @@ const App = () => (
               </ProtectedRoute>
             } />
             
-            <Route path="/dashboard/sec" element={
+            <Route path="/dashboard/wel" element={
               <ProtectedRoute>
                 <div className="p-8">
-                  <h1 className="text-2xl font-bold">Secretary Dashboard</h1>
-                  <p className="mt-4">Your Secretary dashboard will appear here.</p>
+                  <h1 className="text-2xl font-bold">Welfare Dashboard</h1>
+                  <p className="mt-4">Your Welfare dashboard will appear here.</p>
                 </div>
               </ProtectedRoute>
             } />
             
-            <Route path="/dashboard/bm" element={
+            <Route path="/dashboard/bmem" element={
               <ProtectedRoute>
                 <div className="p-8">
-                  <h1 className="text-2xl font-bold">Business Manager Dashboard</h1>
-                  <p className="mt-4">Your Business Manager dashboard will appear here.</p>
+                  <h1 className="text-2xl font-bold">Board Member Dashboard</h1>
+                  <p className="mt-4">Your Board Member dashboard will appear here.</p>
                 </div>
               </ProtectedRoute>
             } />
             
-            <Route path="/dashboard/gm" element={
+            {/* Keep any existing routes */}
+            <Route path="/dashboard/tre" element={
               <ProtectedRoute>
                 <div className="p-8">
-                  <h1 className="text-2xl font-bold">General Member Dashboard</h1>
-                  <p className="mt-4">Your General Member dashboard will appear here.</p>
-                </div>
-              </ProtectedRoute>
-            } />
-            
-            {/* Keep the existing routes */}
-            <Route path="/dashboard/fin" element={
-              <ProtectedRoute>
-                <div className="p-8">
-                  <h1 className="text-2xl font-bold">Finance Dashboard</h1>
-                  <p className="mt-4">Your Finance dashboard will appear here.</p>
+                  <h1 className="text-2xl font-bold">Treasurer Dashboard</h1>
+                  <p className="mt-4">Your Treasurer dashboard will appear here.</p>
                 </div>
               </ProtectedRoute>
             } />

@@ -9,7 +9,7 @@ const Signup = () => {
   return (
     <AuthLayout
       title="Create your account"
-      subtitle="Join the Admin Finance Hub to manage your department"
+      subtitle="Join the organization and access your department dashboard"
     >
       <div className="mb-6 space-y-4">
         <div className="flex justify-center space-x-8">
