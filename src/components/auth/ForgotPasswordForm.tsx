@@ -35,15 +35,17 @@ const ForgotPasswordForm: React.FC = () => {
       }
       
       // Log the password reset request in the audit logs
-      await supabase.rpc('log_audit_event', {
+      const { error: auditError } = await supabase.rpc('log_audit_event', {
         action: 'PASSWORD_RESET_REQUESTED',
         entity_type: 'USER',
         entity_id: '00000000-0000-0000-0000-000000000000', // We don't know the user ID yet
         details: JSON.stringify({ email })
-      }).catch(err => {
-        console.error('Failed to log audit event:', err);
-        // Don't fail the reset process if audit logging fails
       });
+
+      if (auditError) {
+        console.error('Failed to log audit event:', auditError);
+        // Don't fail the reset process if audit logging fails
+      }
       
       setIsLoading(false);
       setIsSuccess(true);
