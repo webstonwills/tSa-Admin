@@ -3,19 +3,19 @@ import React from 'react';
 import AuthLayout from '@/components/layout/AuthLayout';
 import ForgotPasswordForm from '@/components/auth/ForgotPasswordForm';
 import { motion } from 'framer-motion';
-import { Mail, Key, Shield } from 'lucide-react';
+import { Mail, KeyRound, Shield } from 'lucide-react';
 
 const ForgotPassword = () => {
   return (
     <AuthLayout
       title="Reset your password"
-      subtitle="Enter your email to receive a password reset link"
+      subtitle="Enter your email to receive a verification code"
     >
       <div className="mb-6 space-y-4">
         <div className="flex justify-center space-x-8">
           {[
-            { icon: Mail, text: 'Email Verification' },
-            { icon: Key, text: 'Password Reset' },
+            { icon: Mail, text: 'Request Code' },
+            { icon: KeyRound, text: 'Verify & Reset' },
             { icon: Shield, text: 'Secure Process' },
           ].map((item, index) => (
             <motion.div

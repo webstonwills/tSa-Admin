@@ -35,7 +35,6 @@ const App = () => (
             <Route path="/auth/login" element={<Login />} />
             <Route path="/auth/signup" element={<Signup />} />
             <Route path="/auth/forgot-password" element={<ForgotPassword />} />
-            <Route path="/auth/reset-password" element={<Login />} /> {/* Add this explicit route for password reset */}
             
             {/* Protected Dashboard Routes */}
             <Route path="/dashboard/ceo" element={
