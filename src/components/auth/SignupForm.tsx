@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
@@ -70,46 +71,28 @@ const SignupForm: React.FC = () => {
         return;
       }
       
-      // Query existing departments first
+      // First, get the department from the database instead of trying to create it
       const { data: existingDepts, error: deptQueryError } = await supabase
         .from('departments')
-        .select('id, department_code')
-        .eq('department_code', selectedDept.code);
+        .select('id')
+        .eq('department_code', selectedDept.code)
+        .single();
       
       if (deptQueryError) {
-        console.error('Error querying departments:', deptQueryError);
-        toast.error(`Error querying departments: ${deptQueryError.message}`);
+        console.error('Error finding department:', deptQueryError);
+        toast.error(`Error finding department: ${deptQueryError.message}`);
         setIsLoading(false);
         return;
       }
       
-      let departmentDbId;
-      
-      // If department exists, use it - otherwise create it
-      if (existingDepts && existingDepts.length > 0) {
-        departmentDbId = existingDepts[0].id;
-        console.log(`Found existing department: ${selectedDept.code} with ID: ${departmentDbId}`);
-      } else {
-        // Create new department with a public insert that doesn't require auth
-        const { data: newDept, error: createDeptError } = await supabase
-          .from('departments')
-          .insert({
-            name: selectedDept.name,
-            department_code: selectedDept.code,
-          })
-          .select('id')
-          .single();
-        
-        if (createDeptError) {
-          console.error('Error creating department:', createDeptError);
-          toast.error(`Department creation failed: ${createDeptError.message}`);
-          setIsLoading(false);
-          return;
-        }
-        
-        departmentDbId = newDept.id;
-        console.log(`Created new department: ${selectedDept.code} with ID: ${departmentDbId}`);
+      if (!existingDepts || !existingDepts.id) {
+        toast.error(`Department ${selectedDept.name} not found`);
+        setIsLoading(false);
+        return;
       }
+      
+      const departmentDbId = existingDepts.id;
+      console.log(`Found department: ${selectedDept.code} with ID: ${departmentDbId}`);
       
       // Sign up user with Supabase Auth
       const { data: authData, error: authError } = await supabase.auth.signUp({
