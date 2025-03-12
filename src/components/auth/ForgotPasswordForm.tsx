@@ -23,9 +23,13 @@ const ForgotPasswordForm: React.FC = () => {
     setIsLoading(true);
     
     try {
-      // Send password reset email using Supabase
+      // Get the current domain for proper redirect
+      const currentDomain = window.location.origin;
+      console.log('Reset password redirect domain:', currentDomain);
+      
+      // Send password reset email using Supabase with the correct redirect URL
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}/auth/login`,
+        redirectTo: `${currentDomain}/auth/login`,
       });
       
       if (error) {
