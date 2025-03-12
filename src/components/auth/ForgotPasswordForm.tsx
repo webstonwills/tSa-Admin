@@ -23,7 +23,7 @@ const ForgotPasswordForm: React.FC = () => {
     setIsLoading(true);
     
     try {
-      // Get the current domain for proper redirect
+      // Get the COMPLETE domain for proper redirect (including protocol)
       const currentDomain = window.location.origin;
       console.log('Reset password redirect domain:', currentDomain);
       
