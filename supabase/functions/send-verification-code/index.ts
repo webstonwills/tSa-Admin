@@ -42,14 +42,35 @@ serve(async (req) => {
     const resetCode = Math.floor(100000 + Math.random() * 900000).toString();
     console.log(`Generated reset code: ${resetCode}`);
 
+    // Check if the user exists first
+    const { data: existingUsers, error: findUserError } = await supabaseAdmin.auth.admin.listUsers({
+      filters: {
+        email: email
+      }
+    });
+
+    if (findUserError) {
+      console.error("Error finding user:", findUserError);
+      return new Response(
+        JSON.stringify({ error: "Error finding user" }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    if (!existingUsers.users || existingUsers.users.length === 0) {
+      // We don't want to reveal if the email exists or not for security reasons
+      // Instead, return a success message but don't actually send anything
+      return new Response(
+        JSON.stringify({ success: true, message: "If the email exists, a verification code has been sent" }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    const userId = existingUsers.users[0].id;
+
     // Store the code in the user's metadata
     const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(
-      // First we need to get the user ID
-      (await supabaseAdmin.auth.admin.listUsers({
-        filters: {
-          email: email
-        }
-      })).data.users[0]?.id || "",
+      userId,
       {
         app_metadata: {
           reset_code: resetCode,
@@ -66,13 +87,17 @@ serve(async (req) => {
       );
     }
 
-    // Send the verification code email
-    const { error: emailError } = await supabaseAdmin.functions.invoke("send-email", {
-      body: {
-        to: email,
-        subject: "Your Password Reset Code",
-        text: `Your verification code for password reset is: ${resetCode}\n\nThis code will expire in 1 hour.\n\nIf you did not request this code, please ignore this email.`,
-        html: `
+    // Send the verification code email directly using Supabase Auth's email service
+    const { error: emailError } = await supabaseAdmin.auth.admin.sendEmail(
+      email,
+      {
+        type: "recovery", // Using recovery type as it's closest to our use case
+        additional: {
+          // Augment dynamic variables to be used in template
+          "OTP": resetCode
+        },
+        email_subject: "Your Password Reset Code",
+        email_html: `
           <h2>Your Password Reset Code</h2>
           <p>Your verification code for password reset is:</p>
           <div style="margin: 24px 0; padding: 16px; background-color: #f4f4f4; border-radius: 4px; font-size: 24px; text-align: center; letter-spacing: 4px; font-weight: bold;">
@@ -80,9 +105,9 @@ serve(async (req) => {
           </div>
           <p>This code will expire in 1 hour.</p>
           <p>If you did not request this code, please ignore this email.</p>
-        `
+        `,
       }
-    });
+    );
 
     if (emailError) {
       console.error("Error sending verification email:", emailError);
@@ -100,7 +125,7 @@ serve(async (req) => {
   } catch (error) {
     console.error("Unexpected error:", error);
     return new Response(
-      JSON.stringify({ error: "An unexpected error occurred" }),
+      JSON.stringify({ error: "An unexpected error occurred", details: error.message }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }

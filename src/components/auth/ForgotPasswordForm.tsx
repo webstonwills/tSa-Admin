@@ -1,9 +1,12 @@
+
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { toast } from 'sonner';
 import { Loader2, Mail, ArrowLeft, CheckCircle, KeyRound } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 
 const ForgotPasswordForm: React.FC = () => {
   const [email, setEmail] = useState('');
@@ -28,19 +31,20 @@ const ForgotPasswordForm: React.FC = () => {
       const { data, error } = await supabase.functions.invoke('send-verification-code', {
         body: { email }
       });
+
+      setIsLoading(false);
       
       if (error) {
+        console.error('Error details:', error);
         toast.error(error.message || 'Failed to send verification code');
-        setIsLoading(false);
         return;
       }
       
-      setIsLoading(false);
       setStep('verification');
       toast.success('Verification code sent to your email');
-    } catch (error) {
+    } catch (error: any) {
       console.error('Password reset error:', error);
-      toast.error('An unexpected error occurred');
+      toast.error('An unexpected error occurred. Please try again.');
       setIsLoading(false);
     }
   };
@@ -70,18 +74,18 @@ const ForgotPasswordForm: React.FC = () => {
         }
       });
       
+      setIsLoading(false);
+      
       if (error) {
         toast.error(error.message || 'Invalid verification code');
-        setIsLoading(false);
         return;
       }
       
-      setIsLoading(false);
       setStep('success');
       toast.success('Password successfully reset');
-    } catch (error) {
+    } catch (error: any) {
       console.error('Password reset verification error:', error);
-      toast.error('An unexpected error occurred');
+      toast.error('An unexpected error occurred. Please try again.');
       setIsLoading(false);
     }
   };
@@ -96,7 +100,7 @@ const ForgotPasswordForm: React.FC = () => {
           <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
             <Mail className="h-5 w-5 text-gray-400" />
           </div>
-          <input
+          <Input
             id="email"
             name="email"
             type="email"
@@ -104,28 +108,24 @@ const ForgotPasswordForm: React.FC = () => {
             required
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            className="block w-full pl-10 appearance-none rounded-md border border-gray-300 px-3 py-2 placeholder-gray-400 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm dark:bg-gray-800 dark:border-gray-700 dark:text-white"
+            className="pl-10"
             placeholder="Enter your email"
           />
         </div>
       </div>
 
       <div>
-        <motion.button
-          whileTap={{ scale: 0.98 }}
+        <Button
           type="submit"
           disabled={isLoading}
-          className={`flex w-full justify-center rounded-md border border-transparent py-2.5 px-4 text-sm font-medium text-white shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ${
-            isLoading 
-              ? 'bg-blue-400 cursor-not-allowed' 
-              : 'bg-blue-600 hover:bg-blue-700'
-          }`}
+          className="w-full"
         >
           {isLoading ? (
-            <Loader2 className="animate-spin h-5 w-5 mr-2" />
-          ) : null}
-          {isLoading ? 'Sending...' : 'Send verification code'}
-        </motion.button>
+            <><Loader2 className="animate-spin h-5 w-5 mr-2" /> Sending...</>
+          ) : (
+            'Send verification code'
+          )}
+        </Button>
       </div>
 
       <div className="text-center text-sm">
@@ -147,14 +147,14 @@ const ForgotPasswordForm: React.FC = () => {
           <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
             <KeyRound className="h-5 w-5 text-gray-400" />
           </div>
-          <input
+          <Input
             id="verification-code"
             name="verification-code"
             type="text"
             required
             value={verificationCode}
             onChange={(e) => setVerificationCode(e.target.value)}
-            className="block w-full pl-10 appearance-none rounded-md border border-gray-300 px-3 py-2 placeholder-gray-400 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm dark:bg-gray-800 dark:border-gray-700 dark:text-white"
+            className="pl-10"
             placeholder="Enter 6-digit code"
             maxLength={6}
             pattern="[0-9]{6}"
@@ -173,14 +173,14 @@ const ForgotPasswordForm: React.FC = () => {
           <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
             <KeyRound className="h-5 w-5 text-gray-400" />
           </div>
-          <input
+          <Input
             id="new-password"
             name="new-password"
             type="password"
             required
             value={newPassword}
             onChange={(e) => setNewPassword(e.target.value)}
-            className="block w-full pl-10 appearance-none rounded-md border border-gray-300 px-3 py-2 placeholder-gray-400 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm dark:bg-gray-800 dark:border-gray-700 dark:text-white"
+            className="pl-10"
             placeholder="Enter new password"
             minLength={8}
           />
@@ -191,21 +191,17 @@ const ForgotPasswordForm: React.FC = () => {
       </div>
 
       <div>
-        <motion.button
-          whileTap={{ scale: 0.98 }}
+        <Button
           type="submit"
           disabled={isLoading}
-          className={`flex w-full justify-center rounded-md border border-transparent py-2.5 px-4 text-sm font-medium text-white shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ${
-            isLoading 
-              ? 'bg-blue-400 cursor-not-allowed' 
-              : 'bg-blue-600 hover:bg-blue-700'
-          }`}
+          className="w-full"
         >
           {isLoading ? (
-            <Loader2 className="animate-spin h-5 w-5 mr-2" />
-          ) : null}
-          {isLoading ? 'Verifying...' : 'Reset Password'}
-        </motion.button>
+            <><Loader2 className="animate-spin h-5 w-5 mr-2" /> Verifying...</>
+          ) : (
+            'Reset Password'
+          )}
+        </Button>
       </div>
 
       <div className="text-center text-sm">
@@ -231,15 +227,14 @@ const ForgotPasswordForm: React.FC = () => {
         Your password has been successfully reset.
       </p>
       <div className="mt-6">
-        <motion.button
-          whileTap={{ scale: 0.98 }}
+        <Button
           type="button"
           onClick={() => navigate('/auth/login')}
-          className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="inline-flex items-center"
         >
           <ArrowLeft className="h-4 w-4 mr-1" />
           Back to sign in
-        </motion.button>
+        </Button>
       </div>
     </div>
   );

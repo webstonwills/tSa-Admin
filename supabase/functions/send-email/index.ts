@@ -36,20 +36,20 @@ serve(async (req) => {
       }
     );
 
-    // Send email using custom template
-    const { error: emailError } = await supabaseAdmin.auth.admin.sendEmailWithTemplate({
-      email: to,
-      template_name: "recovery",  // Using the built-in recovery template
-      template_values: {
-        code: text, // We'll pass the verification code as "code" for the template
-        email: to,
+    // Send email using Supabase Auth's email service
+    const { error: emailError } = await supabaseAdmin.auth.admin.sendEmail(
+      to,
+      {
+        type: "recovery", // Using recovery type as it's closest to our use case
+        email_subject: subject,
+        email_html: html || `<p>${text}</p>`,
       }
-    });
+    );
 
     if (emailError) {
       console.error("Error sending email:", emailError);
       return new Response(
-        JSON.stringify({ error: "Failed to send email" }),
+        JSON.stringify({ error: "Failed to send email", details: emailError.message }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -62,7 +62,7 @@ serve(async (req) => {
   } catch (error) {
     console.error("Unexpected error:", error);
     return new Response(
-      JSON.stringify({ error: "An unexpected error occurred" }),
+      JSON.stringify({ error: "An unexpected error occurred", details: error.message }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
