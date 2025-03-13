@@ -36,7 +36,7 @@ serve(async (req) => {
       }
     );
 
-    // Send the email using Supabase Auth sendRawMagicLink (bypassing the link functionality)
+    // Send the email using Supabase Auth sendRawEmail
     const { error: emailError } = await supabaseAdmin.auth.admin.sendRawMagicLink({
       email: to,
       subject: subject,
