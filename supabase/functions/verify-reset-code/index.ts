@@ -36,20 +36,6 @@ serve(async (req) => {
       }
     );
 
-    // Verify the reset code
-    const { data: isValid, error: verifyError } = await supabaseAdmin.rpc(
-      "verify_reset_code",
-      { email_param: email, code_param: code }
-    );
-
-    if (verifyError || !isValid) {
-      console.error("Error verifying reset code:", verifyError);
-      return new Response(
-        JSON.stringify({ error: "Invalid or expired verification code" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
     // Get the user
     const { data: userData, error: getUserError } = await supabaseAdmin.auth.admin.listUsers({
       filters: { email: email }
@@ -63,7 +49,42 @@ serve(async (req) => {
       );
     }
 
-    const userId = userData.users[0].id;
+    const user = userData.users[0];
+    const userId = user.id;
+    
+    // Verify the reset code
+    const storedCode = user.app_metadata?.reset_code;
+    const expiresAt = user.app_metadata?.reset_code_expires_at;
+    
+    if (!storedCode || storedCode !== code) {
+      return new Response(
+        JSON.stringify({ error: "Invalid verification code" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+    
+    if (expiresAt && new Date(expiresAt) < new Date()) {
+      return new Response(
+        JSON.stringify({ error: "Verification code has expired" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // Clear the reset code
+    const { error: clearError } = await supabaseAdmin.auth.admin.updateUserById(
+      userId,
+      {
+        app_metadata: {
+          reset_code: null,
+          reset_code_expires_at: null
+        }
+      }
+    );
+
+    if (clearError) {
+      console.error("Error clearing reset code:", clearError);
+      // Don't fail the process if clearing the code fails
+    }
 
     // Update the user's password
     const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(
@@ -77,19 +98,6 @@ serve(async (req) => {
         JSON.stringify({ error: "Failed to update password" }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
-    }
-
-    // Log the password reset in audit logs
-    const { error: auditError } = await supabaseAdmin.rpc('log_audit_event', {
-      action: 'PASSWORD_RESET_COMPLETED',
-      entity_type: 'USER',
-      entity_id: userId,
-      details: JSON.stringify({ email })
-    });
-
-    if (auditError) {
-      console.error('Failed to log audit event:', auditError);
-      // Don't fail the reset process if audit logging fails
     }
 
     // Return success response

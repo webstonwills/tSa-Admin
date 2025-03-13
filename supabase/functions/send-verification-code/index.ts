@@ -24,6 +24,8 @@ serve(async (req) => {
       );
     }
 
+    console.log(`Sending verification code to: ${email}`);
+
     // Create a Supabase client with the Admin key
     const supabaseAdmin = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
@@ -36,16 +38,30 @@ serve(async (req) => {
       }
     );
 
-    // Generate a reset code
-    const { data: resetCode, error: codeError } = await supabaseAdmin.rpc(
-      "generate_reset_code",
-      { email_param: email }
+    // Generate a 6-digit code
+    const resetCode = Math.floor(100000 + Math.random() * 900000).toString();
+    console.log(`Generated reset code: ${resetCode}`);
+
+    // Store the code in the user's metadata
+    const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(
+      // First we need to get the user ID
+      (await supabaseAdmin.auth.admin.listUsers({
+        filters: {
+          email: email
+        }
+      })).data.users[0]?.id || "",
+      {
+        app_metadata: {
+          reset_code: resetCode,
+          reset_code_expires_at: new Date(Date.now() + 3600000).toISOString() // 1 hour from now
+        }
+      }
     );
 
-    if (codeError) {
-      console.error("Error generating reset code:", codeError);
+    if (updateError) {
+      console.error("Error storing reset code:", updateError);
       return new Response(
-        JSON.stringify({ error: "Failed to generate reset code" }),
+        JSON.stringify({ error: "Failed to store reset code" }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }

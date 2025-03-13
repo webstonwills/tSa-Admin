@@ -36,14 +36,14 @@ serve(async (req) => {
       }
     );
 
-    // Send the email using Supabase Auth sendRawEmail
-    const { error: emailError } = await supabaseAdmin.auth.admin.sendRawMagicLink({
+    // Send email using custom template
+    const { error: emailError } = await supabaseAdmin.auth.admin.sendEmailWithTemplate({
       email: to,
-      subject: subject,
-      bodyText: text || "",
-      bodyHtml: html || "",
-      // We set a dummy redirect URL as this is required but we don't actually use it
-      redirectTo: `${Deno.env.get("SITE_URL") || ""}/auth/forgot-password`,
+      template_name: "recovery",  // Using the built-in recovery template
+      template_values: {
+        code: text, // We'll pass the verification code as "code" for the template
+        email: to,
+      }
     });
 
     if (emailError) {
