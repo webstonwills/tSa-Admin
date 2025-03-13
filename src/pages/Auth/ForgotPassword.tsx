@@ -14,9 +14,9 @@ const ForgotPassword = () => {
       <div className="mb-6 space-y-4">
         <div className="flex justify-center space-x-8">
           {[
-            { icon: Mail, text: 'Request Code' },
-            { icon: KeyRound, text: 'Verify & Reset' },
-            { icon: Shield, text: 'Secure Process' },
+            { icon: Mail, text: 'Get Code' },
+            { icon: KeyRound, text: 'Enter Code' },
+            { icon: Shield, text: 'Reset Password' },
           ].map((item, index) => (
             <motion.div
               key={index}

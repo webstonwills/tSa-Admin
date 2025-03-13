@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
@@ -25,28 +24,15 @@ const ForgotPasswordForm: React.FC = () => {
     setIsLoading(true);
     
     try {
-      // Send OTP through Supabase Auth
-      const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}/auth/forgot-password`,
+      // Call our edge function to send a verification code
+      const { data, error } = await supabase.functions.invoke('send-verification-code', {
+        body: { email }
       });
       
       if (error) {
-        toast.error(error.message);
+        toast.error(error.message || 'Failed to send verification code');
         setIsLoading(false);
         return;
-      }
-      
-      // Log the password reset request in the audit logs
-      const { error: auditError } = await supabase.rpc('log_audit_event', {
-        action: 'PASSWORD_RESET_REQUESTED',
-        entity_type: 'USER',
-        entity_id: '00000000-0000-0000-0000-000000000000', // We don't know the user ID yet
-        details: JSON.stringify({ email })
-      });
-
-      if (auditError) {
-        console.error('Failed to log audit event:', auditError);
-        // Don't fail the reset process if audit logging fails
       }
       
       setIsLoading(false);
@@ -75,43 +61,19 @@ const ForgotPasswordForm: React.FC = () => {
     setIsLoading(true);
     
     try {
-      // Verify OTP and update password
-      const { error } = await supabase.auth.verifyOtp({
-        email,
-        token: verificationCode,
-        type: 'recovery',
+      // Call our edge function to verify the code and reset password
+      const { data, error } = await supabase.functions.invoke('verify-reset-code', {
+        body: { 
+          email, 
+          code: verificationCode, 
+          newPassword 
+        }
       });
       
       if (error) {
         toast.error(error.message || 'Invalid verification code');
         setIsLoading(false);
         return;
-      }
-      
-      // Now set the new password
-      const { error: updateError } = await supabase.auth.updateUser({
-        password: newPassword,
-      });
-      
-      if (updateError) {
-        toast.error(updateError.message || 'Failed to update password');
-        setIsLoading(false);
-        return;
-      }
-      
-      // Log the successful password reset
-      const { data: userData } = await supabase.auth.getUser();
-      if (userData?.user) {
-        const { error: auditError } = await supabase.rpc('log_audit_event', {
-          action: 'PASSWORD_RESET_COMPLETED',
-          entity_type: 'USER',
-          entity_id: userData.user.id,
-          details: JSON.stringify({ email })
-        });
-
-        if (auditError) {
-          console.error('Failed to log audit event:', auditError);
-        }
       }
       
       setIsLoading(false);

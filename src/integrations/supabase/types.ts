@@ -156,6 +156,12 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      generate_reset_code: {
+        Args: {
+          email_param: string
+        }
+        Returns: string
+      }
       log_audit_event: {
         Args: {
           action: string
@@ -164,6 +170,13 @@ export type Database = {
           details: Json
         }
         Returns: string
+      }
+      verify_reset_code: {
+        Args: {
+          email_param: string
+          code_param: string
+        }
+        Returns: boolean
       }
     }
     Enums: {
