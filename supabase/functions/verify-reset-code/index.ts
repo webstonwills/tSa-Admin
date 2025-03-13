@@ -50,11 +50,24 @@ serve(async (req) => {
       );
     }
 
+    // Get the user
+    const { data: userData, error: getUserError } = await supabaseAdmin.auth.admin.listUsers({
+      filters: { email: email }
+    });
+
+    if (getUserError || !userData.users || userData.users.length === 0) {
+      console.error("Error finding user:", getUserError);
+      return new Response(
+        JSON.stringify({ error: "User not found" }),
+        { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    const userId = userData.users[0].id;
+
     // Update the user's password
     const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(
-      (await supabaseAdmin.auth.admin.listUsers({ 
-        filters: { email: email } 
-      })).data.users[0].id,
+      userId,
       { password: newPassword }
     );
 
@@ -70,9 +83,7 @@ serve(async (req) => {
     const { error: auditError } = await supabaseAdmin.rpc('log_audit_event', {
       action: 'PASSWORD_RESET_COMPLETED',
       entity_type: 'USER',
-      entity_id: (await supabaseAdmin.auth.admin.listUsers({ 
-        filters: { email: email } 
-      })).data.users[0].id,
+      entity_id: userId,
       details: JSON.stringify({ email })
     });
 

@@ -51,20 +51,21 @@ serve(async (req) => {
     }
 
     // Send the verification code email
-    const { error: emailError } = await supabaseAdmin.auth.admin.sendRawMagicLink({
-      email,
-      subject: "Your Password Reset Code",
-      bodyText: `Your verification code for password reset is: ${resetCode}\n\nThis code will expire in 1 hour.\n\nIf you did not request this code, please ignore this email.`,
-      bodyHtml: `
-        <h2>Your Password Reset Code</h2>
-        <p>Your verification code for password reset is:</p>
-        <div style="margin: 24px 0; padding: 16px; background-color: #f4f4f4; border-radius: 4px; font-size: 24px; text-align: center; letter-spacing: 4px; font-weight: bold;">
-          ${resetCode}
-        </div>
-        <p>This code will expire in 1 hour.</p>
-        <p>If you did not request this code, please ignore this email.</p>
-      `,
-      redirectTo: `${Deno.env.get("SITE_URL") || ""}/auth/forgot-password`,
+    const { error: emailError } = await supabaseAdmin.functions.invoke("send-email", {
+      body: {
+        to: email,
+        subject: "Your Password Reset Code",
+        text: `Your verification code for password reset is: ${resetCode}\n\nThis code will expire in 1 hour.\n\nIf you did not request this code, please ignore this email.`,
+        html: `
+          <h2>Your Password Reset Code</h2>
+          <p>Your verification code for password reset is:</p>
+          <div style="margin: 24px 0; padding: 16px; background-color: #f4f4f4; border-radius: 4px; font-size: 24px; text-align: center; letter-spacing: 4px; font-weight: bold;">
+            ${resetCode}
+          </div>
+          <p>This code will expire in 1 hour.</p>
+          <p>If you did not request this code, please ignore this email.</p>
+        `
+      }
     });
 
     if (emailError) {
