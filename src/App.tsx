@@ -20,6 +20,7 @@ import BusinessManagementDashboard from "./pages/Dashboard/BusinessManagement";
 import AuditorDashboard from "./pages/Dashboard/Auditor";
 import WelfareDashboard from "./pages/Dashboard/Welfare";
 import BoardMemberDashboard from "./pages/Dashboard/BoardMember";
+import Forum from "./pages/Dashboard/Forum";
 
 const queryClient = new QueryClient();
 
@@ -44,6 +45,9 @@ const App = () => (
             <Route path="/dashboard/aud" element={<ProtectedRoute><AuditorDashboard /></ProtectedRoute>} />
             <Route path="/dashboard/wel" element={<ProtectedRoute><WelfareDashboard /></ProtectedRoute>} />
             <Route path="/dashboard/bmem" element={<ProtectedRoute><BoardMemberDashboard /></ProtectedRoute>} />
+            
+            {/* Forum Route */}
+            <Route path="/dashboard/forum" element={<ProtectedRoute><Forum /></ProtectedRoute>} />
             
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />

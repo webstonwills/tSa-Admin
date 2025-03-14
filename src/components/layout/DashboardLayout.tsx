@@ -1,10 +1,13 @@
 
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Outlet } from 'react-router-dom';
+import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
 import AppSidebar from '../ui/AppSidebar';
 import { useIsMobile } from '@/hooks/use-mobile';
-import { Menu } from 'lucide-react';
+import { Menu, MessageSquare, Bell, Search, LogOut } from 'lucide-react';
+import { useAuth } from '@/components/auth/AuthContext';
+import { Button } from '@/components/ui/button';
+import { useToast } from '@/hooks/use-toast';
 
 interface DashboardLayoutProps {
   children: React.ReactNode;
@@ -13,6 +16,10 @@ interface DashboardLayoutProps {
 const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const isMobile = useIsMobile();
+  const location = useLocation();
+  const navigate = useNavigate();
+  const { signOut } = useAuth();
+  const { toast } = useToast();
 
   // Close sidebar on route change if on mobile
   useEffect(() => {
@@ -20,6 +27,23 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
       setSidebarOpen(false);
     }
   }, [location, isMobile]);
+
+  const handleSignOut = async () => {
+    try {
+      await signOut();
+      toast({
+        title: "Signed out",
+        description: "You have been successfully signed out.",
+      });
+    } catch (error) {
+      console.error("Error signing out:", error);
+      toast({
+        title: "Error",
+        description: "Could not sign out. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
 
   return (
     <div className="h-screen overflow-hidden bg-gradient-to-br from-blue-50 to-gray-50">
@@ -77,9 +101,7 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
                 <div className="w-full max-w-2xl lg:max-w-none">
                   <div className="relative text-gray-400 focus-within:text-gray-500">
                     <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
-                      <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                        <path fillRule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clipRule="evenodd" />
-                      </svg>
+                      <Search className="h-5 w-5" />
                     </div>
                     <input
                       id="search"
@@ -92,20 +114,27 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
                 </div>
               </div>
               
-              <div className="ml-4 flex items-center md:ml-6">
+              <div className="ml-4 flex items-center md:ml-6 space-x-2">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="text-gray-400 hover:text-gray-500"
+                  onClick={() => navigate('/dashboard/forum')}
+                >
+                  <MessageSquare className="h-5 w-5" />
+                </Button>
+                
                 <button
                   type="button"
                   className="rounded-full bg-white p-1 text-gray-400 hover:text-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
                   <span className="sr-only">View notifications</span>
-                  <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M14.857 17.082a23.848 23.848 0 005.454-1.31A8.967 8.967 0 0118 9.75v-.7V9A6 6 0 006 9v.75a8.967 8.967 0 01-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 01-5.714 0m5.714 0a3 3 0 11-5.714 0" />
-                  </svg>
+                  <Bell className="h-6 w-6" />
                 </button>
 
                 {/* Profile dropdown */}
                 <div className="ml-3 relative">
-                  <div>
+                  <div className="flex items-center">
                     <button
                       type="button"
                       className="flex max-w-xs items-center rounded-full bg-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
@@ -115,6 +144,15 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
                         U
                       </div>
                     </button>
+                    
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="ml-2 text-gray-400 hover:text-gray-500"
+                      onClick={handleSignOut}
+                    >
+                      <LogOut className="h-5 w-5" />
+                    </Button>
                   </div>
                 </div>
               </div>
