@@ -27,47 +27,50 @@ serve(async (req) => {
 
     console.log(`Sending email to: ${to}, subject: ${subject}`);
 
-    // Create a Supabase client with the Admin key
-    const supabaseAdmin = createClient(
-      Deno.env.get("SUPABASE_URL") ?? "",
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
-      {
-        auth: {
-          autoRefreshToken: false,
-          persistSession: false,
-        },
+    try {
+      // Create a Supabase client with the Admin key
+      const supabaseAdmin = createClient(
+        Deno.env.get("SUPABASE_URL") ?? "",
+        Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
+        {
+          auth: {
+            autoRefreshToken: false,
+            persistSession: false,
+          },
+        }
+      );
+
+      // Use the direct-email-send function to send the email
+      const emailContent = html || `<p>${text || ""}</p>`;
+      console.log("Email content:", emailContent.substring(0, 100) + "...");
+
+      const { data, error: emailError } = await supabaseAdmin.functions.invoke("direct-email-send", {
+        body: {
+          to,
+          subject,
+          html: emailContent
+        }
+      });
+
+      if (emailError) {
+        throw emailError;
       }
-    );
 
-    // Try using a different method to send email
-    // Here we'll use a direct API call to send a simple email
-    const emailContent = html || `<p>${text || ""}</p>`;
-    console.log("Email content:", emailContent.substring(0, 100) + "...");
+      console.log("Email sent successfully:", data);
 
-    const { data, error: emailError } = await supabaseAdmin.functions.invoke("direct-email-send", {
-      body: {
-        to,
-        subject,
-        html: emailContent
-      }
-    });
-
-    if (emailError) {
-      console.error("Error sending email:", emailError);
+      // Return the same response as direct-email-send
+      return new Response(
+        JSON.stringify(data),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    } catch (emailError: any) {
+      console.error("Email sending failed:", emailError);
       return new Response(
         JSON.stringify({ error: "Failed to send email", details: emailError.message }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
-
-    console.log("Email sent successfully:", data);
-
-    // Return success response
-    return new Response(
-      JSON.stringify({ success: true, message: "Email sent successfully" }),
-      { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
-  } catch (error) {
+  } catch (error: any) {
     console.error("Unexpected error in send-email:", error);
     return new Response(
       JSON.stringify({ error: "An unexpected error occurred", details: error.message }),
