@@ -18,11 +18,14 @@ serve(async (req) => {
     const { to, subject, text, html } = await req.json();
     
     if (!to || !subject) {
+      console.error("Missing required fields:", { to, subject });
       return new Response(
         JSON.stringify({ error: "Email recipient and subject are required" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
+
+    console.log(`Sending email to: ${to}, subject: ${subject}`);
 
     // Create a Supabase client with the Admin key
     const supabaseAdmin = createClient(
@@ -36,15 +39,18 @@ serve(async (req) => {
       }
     );
 
-    // Send email using Supabase Auth's email service
-    const { error: emailError } = await supabaseAdmin.auth.admin.sendEmail(
-      to,
-      {
-        type: "recovery", // Using recovery type as it's closest to our use case
-        email_subject: subject,
-        email_html: html || `<p>${text}</p>`,
+    // Try using a different method to send email
+    // Here we'll use a direct API call to send a simple email
+    const emailContent = html || `<p>${text || ""}</p>`;
+    console.log("Email content:", emailContent.substring(0, 100) + "...");
+
+    const { data, error: emailError } = await supabaseAdmin.functions.invoke("direct-email-send", {
+      body: {
+        to,
+        subject,
+        html: emailContent
       }
-    );
+    });
 
     if (emailError) {
       console.error("Error sending email:", emailError);
@@ -54,13 +60,15 @@ serve(async (req) => {
       );
     }
 
+    console.log("Email sent successfully:", data);
+
     // Return success response
     return new Response(
       JSON.stringify({ success: true, message: "Email sent successfully" }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (error) {
-    console.error("Unexpected error:", error);
+    console.error("Unexpected error in send-email:", error);
     return new Response(
       JSON.stringify({ error: "An unexpected error occurred", details: error.message }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }

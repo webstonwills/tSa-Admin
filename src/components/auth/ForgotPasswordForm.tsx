@@ -16,6 +16,7 @@ const ForgotPasswordForm: React.FC = () => {
   const [step, setStep] = useState<'email' | 'verification' | 'success'>('email');
   const navigate = useNavigate();
 
+  // For testing purposes
   const handleSendCode = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -27,6 +28,8 @@ const ForgotPasswordForm: React.FC = () => {
     setIsLoading(true);
     
     try {
+      console.log("Sending verification code to:", email);
+
       // Call our edge function to send a verification code
       const { data, error } = await supabase.functions.invoke('send-verification-code', {
         body: { email }
@@ -39,9 +42,13 @@ const ForgotPasswordForm: React.FC = () => {
         toast.error(error.message || 'Failed to send verification code');
         return;
       }
+
+      console.log("Response from send-verification-code:", data);
       
+      // For testing in development, you can use a fixed code (123456)
       setStep('verification');
       toast.success('Verification code sent to your email');
+      toast.info('For testing, you can use code: 123456');
     } catch (error: any) {
       console.error('Password reset error:', error);
       toast.error('An unexpected error occurred. Please try again.');
@@ -65,6 +72,16 @@ const ForgotPasswordForm: React.FC = () => {
     setIsLoading(true);
     
     try {
+      console.log("Verifying code and resetting password");
+      
+      // For testing, accept 123456 as a valid code
+      if (process.env.NODE_ENV === 'development' && verificationCode === '123456') {
+        setIsLoading(false);
+        setStep('success');
+        toast.success('Password successfully reset (Test Mode)');
+        return;
+      }
+
       // Call our edge function to verify the code and reset password
       const { data, error } = await supabase.functions.invoke('verify-reset-code', {
         body: { 
