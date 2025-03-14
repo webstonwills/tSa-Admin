@@ -1,8 +1,10 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Outlet } from 'react-router-dom';
 import AppSidebar from '../ui/AppSidebar';
+import { useIsMobile } from '@/hooks/use-mobile';
+import { Menu } from 'lucide-react';
 
 interface DashboardLayoutProps {
   children: React.ReactNode;
@@ -10,6 +12,14 @@ interface DashboardLayoutProps {
 
 const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const isMobile = useIsMobile();
+
+  // Close sidebar on route change if on mobile
+  useEffect(() => {
+    if (isMobile) {
+      setSidebarOpen(false);
+    }
+  }, [location, isMobile]);
 
   return (
     <div className="h-screen overflow-hidden bg-gradient-to-br from-blue-50 to-gray-50">
@@ -57,11 +67,9 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
               type="button"
               className="px-4 text-gray-500 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-blue-500 lg:hidden"
               onClick={() => setSidebarOpen(true)}
+              aria-label="Open sidebar"
             >
-              <span className="sr-only">Open sidebar</span>
-              <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
-              </svg>
+              <Menu className="h-6 w-6" />
             </button>
             
             <div className="flex flex-1 justify-between px-4 sm:px-6 lg:px-8">
@@ -120,7 +128,7 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
             transition={{ duration: 0.5 }}
             className="flex-1 overflow-y-auto bg-gradient-to-br from-blue-50 to-gray-50 focus:outline-none"
           >
-            <div className="py-6 px-4 sm:px-6 lg:px-8">
+            <div className="py-4 px-4 sm:px-6 lg:px-8">
               {children}
             </div>
           </motion.main>

@@ -37,47 +37,13 @@ const App = () => (
             <Route path="/auth/forgot-password" element={<ForgotPassword />} />
             
             {/* Protected Dashboard Routes */}
-            <Route path="/dashboard/ceo" element={
-              <ProtectedRoute>
-                <CEODashboard />
-              </ProtectedRoute>
-            } />
-            
-            <Route path="/dashboard/sec" element={
-              <ProtectedRoute>
-                <SecretaryDashboard />
-              </ProtectedRoute>
-            } />
-            
-            <Route path="/dashboard/fin" element={
-              <ProtectedRoute>
-                <FinanceDashboard />
-              </ProtectedRoute>
-            } />
-            
-            <Route path="/dashboard/bm" element={
-              <ProtectedRoute>
-                <BusinessManagementDashboard />
-              </ProtectedRoute>
-            } />
-            
-            <Route path="/dashboard/aud" element={
-              <ProtectedRoute>
-                <AuditorDashboard />
-              </ProtectedRoute>
-            } />
-            
-            <Route path="/dashboard/wel" element={
-              <ProtectedRoute>
-                <WelfareDashboard />
-              </ProtectedRoute>
-            } />
-            
-            <Route path="/dashboard/bmem" element={
-              <ProtectedRoute>
-                <BoardMemberDashboard />
-              </ProtectedRoute>
-            } />
+            <Route path="/dashboard/ceo" element={<ProtectedRoute><CEODashboard /></ProtectedRoute>} />
+            <Route path="/dashboard/sec" element={<ProtectedRoute><SecretaryDashboard /></ProtectedRoute>} />
+            <Route path="/dashboard/fin" element={<ProtectedRoute><FinanceDashboard /></ProtectedRoute>} />
+            <Route path="/dashboard/bm" element={<ProtectedRoute><BusinessManagementDashboard /></ProtectedRoute>} />
+            <Route path="/dashboard/aud" element={<ProtectedRoute><AuditorDashboard /></ProtectedRoute>} />
+            <Route path="/dashboard/wel" element={<ProtectedRoute><WelfareDashboard /></ProtectedRoute>} />
+            <Route path="/dashboard/bmem" element={<ProtectedRoute><BoardMemberDashboard /></ProtectedRoute>} />
             
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
