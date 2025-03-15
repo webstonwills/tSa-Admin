@@ -1,5 +1,4 @@
 
-import { Helmet } from "react-helmet";
 import { useState, useEffect } from "react";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import ForumChannelList from "@/components/forum/ForumChannelList";
@@ -23,6 +22,15 @@ const Forum = () => {
   const [channels, setChannels] = useState<Channel[]>([]);
   const [selectedChannel, setSelectedChannel] = useState<Channel | null>(null);
   const [loading, setLoading] = useState(true);
+  
+  // Set page title using the document API
+  useEffect(() => {
+    document.title = "Organization Forum | Dashboard";
+    return () => {
+      // Reset title when component unmounts (optional)
+      document.title = "Dashboard";
+    };
+  }, []);
   
   useEffect(() => {
     fetchChannels();
@@ -106,10 +114,6 @@ const Forum = () => {
 
   return (
     <DashboardLayout>
-      <Helmet>
-        <title>Organization Forum | Dashboard</title>
-      </Helmet>
-      
       <div className="space-y-4">
         <div className="flex justify-between items-center">
           <h1 className="text-2xl font-bold">Organization Forum</h1>
