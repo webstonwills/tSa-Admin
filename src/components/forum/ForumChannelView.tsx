@@ -1,5 +1,5 @@
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { Channel } from "@/pages/Dashboard/Forum";
 import { useAuth } from "@/components/auth/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -27,6 +27,19 @@ interface ForumChannelViewProps {
   channel: Channel;
 }
 
+// Array of colors for unique user avatars within the same color family
+const userColors = [
+  "bg-primary", // Default primary color
+  "bg-purple-600",
+  "bg-purple-700",
+  "bg-indigo-500",
+  "bg-indigo-600",
+  "bg-violet-500",
+  "bg-violet-600",
+  "bg-fuchsia-500",
+  "bg-fuchsia-600",
+];
+
 const ForumChannelView = ({ channel }: ForumChannelViewProps) => {
   const { user } = useAuth();
   const { toast } = useToast();
@@ -35,6 +48,22 @@ const ForumChannelView = ({ channel }: ForumChannelViewProps) => {
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
+  
+  // Map to store user colors by user ID
+  const userColorMap = useMemo(() => new Map<string, string>(), []);
+
+  // Function to get a consistent color for a user based on their ID
+  const getUserColor = (userId: string) => {
+    if (!userColorMap.has(userId)) {
+      // Use the hash of the user ID to select a color deterministically
+      const hashCode = userId.split('').reduce((acc, char) => {
+        return char.charCodeAt(0) + ((acc << 5) - acc);
+      }, 0);
+      const colorIndex = Math.abs(hashCode) % userColors.length;
+      userColorMap.set(userId, userColors[colorIndex]);
+    }
+    return userColorMap.get(userId) || "bg-primary";
+  };
 
   useEffect(() => {
     if (channel) {
@@ -185,6 +214,10 @@ const ForumChannelView = ({ channel }: ForumChannelViewProps) => {
   };
 
   const getUserName = (message: Message) => {
+    // First name is prioritized but fallbacks are in place
+    if (message.profile?.first_name) {
+      return message.profile.first_name;
+    }
     if (message.profile?.first_name && message.profile?.last_name) {
       return `${message.profile.first_name} ${message.profile.last_name}`;
     }
@@ -218,7 +251,7 @@ const ForumChannelView = ({ channel }: ForumChannelViewProps) => {
               >
                 <div className={`flex ${isCurrentUser(message.user_id) ? 'flex-row-reverse' : 'flex-row'} items-start gap-2 max-w-[80%]`}>
                   <Avatar className="w-8 h-8 mt-1">
-                    <div className="w-full h-full rounded-full bg-primary flex items-center justify-center text-primary-foreground text-xs font-medium">
+                    <div className={`w-full h-full rounded-full ${isCurrentUser(message.user_id) ? 'bg-primary' : getUserColor(message.user_id)} flex items-center justify-center text-primary-foreground text-xs font-medium`}>
                       {getInitials(message)}
                     </div>
                   </Avatar>
