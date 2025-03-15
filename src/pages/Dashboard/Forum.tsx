@@ -8,6 +8,7 @@ import { Loader2 } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { supabase } from "@/integrations/supabase/client";
 import NewChannelDialog from "@/components/forum/NewChannelDialog";
+import { useLocation } from "react-router-dom";
 
 export interface Channel {
   id: string;
@@ -22,6 +23,10 @@ const Forum = () => {
   const [channels, setChannels] = useState<Channel[]>([]);
   const [selectedChannel, setSelectedChannel] = useState<Channel | null>(null);
   const [loading, setLoading] = useState(true);
+  const location = useLocation();
+  
+  // Check if the current user is a CEO (based on the URL path)
+  const isCEO = location.pathname.includes("/dashboard/ceo");
   
   // Set page title using the document API
   useEffect(() => {
@@ -117,7 +122,7 @@ const Forum = () => {
       <div className="space-y-4">
         <div className="flex justify-between items-center">
           <h1 className="text-2xl font-bold">Organization Forum</h1>
-          <NewChannelDialog onCreateChannel={handleChannelCreate} />
+          {isCEO && <NewChannelDialog onCreateChannel={handleChannelCreate} />}
         </div>
         
         {loading ? (
@@ -143,7 +148,10 @@ const Forum = () => {
                   <div className="flex-1 flex items-center justify-center p-6 text-center text-muted-foreground">
                     {channels.length > 0 ? 
                       "Select a channel to start chatting" : 
-                      "No channels available. Create a new channel to get started."}
+                      isCEO ? 
+                        "No channels available. Create a new channel to get started." :
+                        "No channels available. Only the CEO can create new channels."
+                    }
                   </div>
                 )}
               </Card>

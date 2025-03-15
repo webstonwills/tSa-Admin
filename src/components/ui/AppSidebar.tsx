@@ -17,7 +17,8 @@ import {
   Mail,
   Briefcase,
   Heart,
-  Vote
+  Vote,
+  MessageSquare
 } from 'lucide-react';
 import { useIsMobile } from '@/hooks/use-mobile';
 
@@ -92,6 +93,12 @@ const navigation: NavItem[] = [
     icon: <AlertTriangle className="h-5 w-5" />,
     href: '/audit',
     roles: ['ceo', 'audit', 'aud'],
+  },
+  {
+    name: 'Forum',
+    icon: <MessageSquare className="h-5 w-5" />,
+    href: '/dashboard/forum',
+    roles: ['ceo', 'finance', 'treasurer', 'audit', 'hr', 'operations', 'marketing', 'sec', 'fin', 'bm', 'aud', 'wel', 'bmem'],
   },
   {
     name: 'Settings',
