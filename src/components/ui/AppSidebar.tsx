@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
@@ -97,7 +96,7 @@ const navigation: NavItem[] = [
   {
     name: 'Forum',
     icon: <MessageSquare className="h-5 w-5" />,
-    href: '/dashboard/forum',
+    href: '/dashboard/:role/forum',
     roles: ['ceo', 'finance', 'treasurer', 'audit', 'hr', 'operations', 'marketing', 'sec', 'fin', 'bm', 'aud', 'wel', 'bmem'],
   },
   {
@@ -114,13 +113,15 @@ const AppSidebar: React.FC<AppSidebarProps> = ({ onClose }) => {
   const { signOut, user } = useAuth();
   const isMobile = useIsMobile();
   
-  // Just for demo, in a real app you'd get the role from auth context
   const currentPath = location.pathname;
   const userRole = currentPath.split('/')[2] || 'ceo';
   
   const filteredNavigation = navigation.filter(item => 
     item.roles.includes(userRole)
-  );
+  ).map(item => {
+    const href = item.href.replace(':role', userRole);
+    return { ...item, href };
+  });
 
   const handleLogout = async () => {
     await signOut();

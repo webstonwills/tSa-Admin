@@ -46,8 +46,15 @@ const App = () => (
             <Route path="/dashboard/wel" element={<ProtectedRoute><WelfareDashboard /></ProtectedRoute>} />
             <Route path="/dashboard/bmem" element={<ProtectedRoute><BoardMemberDashboard /></ProtectedRoute>} />
             
-            {/* Forum Route */}
+            {/* Forum Routes - add one for each role to maintain the role in URL for access control */}
             <Route path="/dashboard/forum" element={<ProtectedRoute><Forum /></ProtectedRoute>} />
+            <Route path="/dashboard/ceo/forum" element={<ProtectedRoute><Forum /></ProtectedRoute>} />
+            <Route path="/dashboard/sec/forum" element={<ProtectedRoute><Forum /></ProtectedRoute>} />
+            <Route path="/dashboard/fin/forum" element={<ProtectedRoute><Forum /></ProtectedRoute>} />
+            <Route path="/dashboard/bm/forum" element={<ProtectedRoute><Forum /></ProtectedRoute>} />
+            <Route path="/dashboard/aud/forum" element={<ProtectedRoute><Forum /></ProtectedRoute>} />
+            <Route path="/dashboard/wel/forum" element={<ProtectedRoute><Forum /></ProtectedRoute>} />
+            <Route path="/dashboard/bmem/forum" element={<ProtectedRoute><Forum /></ProtectedRoute>} />
             
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
