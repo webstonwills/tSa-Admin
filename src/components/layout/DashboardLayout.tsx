@@ -116,7 +116,7 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
             <div className="flex items-center h-16 flex-shrink-0 px-4 bg-gradient-to-br from-blue-600 to-blue-700">
               <div className="h-12 w-12 rounded-md bg-white/10 p-1.5 flex items-center justify-center overflow-hidden">
                 <img 
-                  src="/assets/logo-white.png" 
+                  src="./assets/logo-white.png" 
                   alt="TSA Logo" 
                   className="h-9 w-9 object-contain"
                   style={{ filter: 'brightness(0) invert(1)' }}
@@ -141,7 +141,7 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
               <div className="ml-4 lg:ml-0 flex items-center">
                 <div className="h-10 w-10 rounded-md bg-gradient-to-br from-blue-500 to-blue-600 p-1.5 mr-2 flex items-center justify-center overflow-hidden">
                   <img 
-                    src="/assets/logo-white.png" 
+                    src="./assets/logo-white.png" 
                     alt="TSA Logo" 
                     className="h-7 w-7 object-contain"
                     style={{ filter: 'brightness(0) invert(1)' }}
