@@ -27,7 +27,7 @@ const AuthLayout: React.FC<AuthLayoutProps> = ({ children, title, subtitle }) =>
             >
               <div className="h-28 w-28 rounded-xl bg-gradient-to-br from-blue-500 to-blue-600 p-3 shadow-lg flex items-center justify-center overflow-hidden">
                 <img 
-                  src="./assets/logo-white.png" 
+                  src={`${import.meta.env.BASE_URL}assets/logo-white.png`}
                   alt="TSA Logo" 
                   className="h-22 w-22 object-contain"
                   style={{ filter: 'brightness(0) invert(1)' }}
