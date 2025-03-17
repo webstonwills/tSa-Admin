@@ -1,4 +1,4 @@
-import{r as Bc,a as c,R as k,b as Wo,c as fn,d as zc}from"./vendor-DAXxcCGV.js";var On={exports:{}},xt={};/**
+import{r as Bc,a as c,R as k,b as Wo,c as fn,d as zc}from"./vendor.DAXxcCGV.js";var On={exports:{}},xt={};/**
  * @license React
  * react-jsx-runtime.production.min.js
  *
