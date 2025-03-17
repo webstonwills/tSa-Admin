@@ -1,7 +1,6 @@
-
 import React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { toast } from 'sonner';
+import { notify } from '@/components/ui/sonner';
 import { motion } from 'framer-motion';
 import { supabase } from '@/integrations/supabase/client';
 import AuthLayout from '@/components/layout/AuthLayout';
@@ -19,7 +18,7 @@ const Login = () => {
           {[
             { icon: Building, text: 'Department ID' },
             { icon: Lock, text: 'Secure Login' },
-            { icon: ShieldCheck, text: 'Role-based Access' },
+            { icon: ShieldCheck, text: 'Role Access' },
           ].map((item, index) => (
             <motion.div
               key={index}

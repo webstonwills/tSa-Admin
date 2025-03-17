@@ -1,8 +1,7 @@
-
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { toast } from 'sonner';
+import { notify } from '@/components/ui/sonner';
 import { Loader2, Mail, ArrowLeft, CheckCircle, KeyRound } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
@@ -21,7 +20,7 @@ const ForgotPasswordForm: React.FC = () => {
     e.preventDefault();
     
     if (!email) {
-      toast.error('Please enter your email address');
+      notify.error('Please enter your email address');
       return;
     }
     
@@ -39,7 +38,7 @@ const ForgotPasswordForm: React.FC = () => {
       
       if (error) {
         console.error('Error details:', error);
-        toast.error(error.message || 'Failed to send verification code');
+        notify.error(error.message || 'Failed to send verification code');
         return;
       }
 
@@ -47,11 +46,11 @@ const ForgotPasswordForm: React.FC = () => {
       
       // For testing in development, you can use a fixed code (123456)
       setStep('verification');
-      toast.success('Verification code sent to your email');
-      toast.info('For testing, you can use code: 123456');
+      notify.success('Verification code sent to your email');
+      notify.info('For testing, you can use code: 123456');
     } catch (error: any) {
       console.error('Password reset error:', error);
-      toast.error('An unexpected error occurred. Please try again.');
+      notify.error('An unexpected error occurred. Please try again.');
       setIsLoading(false);
     }
   };
@@ -60,12 +59,12 @@ const ForgotPasswordForm: React.FC = () => {
     e.preventDefault();
     
     if (!verificationCode || !newPassword) {
-      toast.error('Please enter both the verification code and new password');
+      notify.error('Please enter both the verification code and new password');
       return;
     }
     
     if (newPassword.length < 8) {
-      toast.error('Password must be at least 8 characters long');
+      notify.error('Password must be at least 8 characters long');
       return;
     }
     
@@ -78,7 +77,7 @@ const ForgotPasswordForm: React.FC = () => {
       if (process.env.NODE_ENV === 'development' && verificationCode === '123456') {
         setIsLoading(false);
         setStep('success');
-        toast.success('Password successfully reset (Test Mode)');
+        notify.success('Password successfully reset (Test Mode)');
         return;
       }
 
@@ -94,15 +93,15 @@ const ForgotPasswordForm: React.FC = () => {
       setIsLoading(false);
       
       if (error) {
-        toast.error(error.message || 'Invalid verification code');
+        notify.error(error.message || 'Invalid verification code');
         return;
       }
       
       setStep('success');
-      toast.success('Password successfully reset');
+      notify.success('Password successfully reset');
     } catch (error: any) {
       console.error('Password reset verification error:', error);
-      toast.error('An unexpected error occurred. Please try again.');
+      notify.error('An unexpected error occurred. Please try again.');
       setIsLoading(false);
     }
   };

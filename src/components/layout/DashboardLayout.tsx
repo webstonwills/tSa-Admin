@@ -1,13 +1,21 @@
-
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
 import AppSidebar from '../ui/AppSidebar';
 import { useIsMobile } from '@/hooks/use-mobile';
-import { Menu, MessageSquare, Bell, Search, LogOut } from 'lucide-react';
+import { Menu, MessageSquare, Bell, Search, LogOut, UserCircle, User, Settings } from 'lucide-react';
 import { useAuth } from '@/components/auth/AuthContext';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 
 interface DashboardLayoutProps {
   children: React.ReactNode;
@@ -18,7 +26,7 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
   const isMobile = useIsMobile();
   const location = useLocation();
   const navigate = useNavigate();
-  const { signOut } = useAuth();
+  const { signOut, userProfile } = useAuth();
   const { toast } = useToast();
 
   // Close sidebar on route change if on mobile
@@ -45,6 +53,32 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
     }
   };
 
+  // Get the current role's base path
+  const getBasePath = () => {
+    const path = location.pathname;
+    const segments = path.split('/');
+    if (segments.length > 2) {
+      return `/dashboard/${segments[2]}`;
+    }
+    return '/dashboard';
+  };
+
+  // Create a profile URL that includes the user's role
+  const getProfileUrl = () => {
+    const basePath = getBasePath();
+    return `${basePath}/profile`;
+  };
+
+  // Get user's initials for avatar
+  const getUserInitials = () => {
+    if (!userProfile) return 'U';
+    
+    const firstName = userProfile.firstName || '';
+    const lastName = userProfile.lastName || '';
+    
+    return `${firstName.charAt(0)}${lastName.charAt(0)}`.toUpperCase() || 'U';
+  };
+
   return (
     <div className="h-screen overflow-hidden bg-gradient-to-br from-blue-50 to-gray-50">
       <div className="flex h-full">
@@ -68,108 +102,121 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
                 onClick={() => setSidebarOpen(false)}
               />
               
-              {/* Sidebar */}
-              <div className="relative h-full w-72">
+              {/* Sidebar content */}
+              <motion.div className="fixed inset-y-0 left-0 z-40 w-64 overflow-y-auto bg-white shadow-lg rounded-r-xl">
                 <AppSidebar onClose={() => setSidebarOpen(false)} />
-              </div>
+              </motion.div>
             </motion.div>
           )}
         </AnimatePresence>
 
-        {/* Desktop sidebar */}
-        <div className="hidden lg:flex lg:flex-shrink-0">
-          <div className="w-72">
-            <AppSidebar onClose={() => {}} />
+        {/* Static sidebar for desktop */}
+        <div className="hidden md:flex md:w-64 md:flex-col md:fixed md:inset-y-0">
+          <div className="flex-1 flex flex-col min-h-0 bg-white shadow-lg">
+            <div className="flex items-center h-16 flex-shrink-0 px-4 bg-gradient-to-br from-blue-600 to-blue-700">
+              <div className="h-12 w-12 rounded-md bg-white/10 p-1.5 flex items-center justify-center overflow-hidden">
+                <img 
+                  src="/assets/logo-white.png" 
+                  alt="TSA Logo" 
+                  className="h-9 w-9 object-contain"
+                  style={{ filter: 'brightness(0) invert(1)' }}
+                />
+              </div>
+              <span className="ml-2 text-xl font-medium text-white">Admin</span>
+            </div>
           </div>
         </div>
 
         {/* Main content */}
-        <div className="flex flex-1 flex-col overflow-hidden">
-          {/* Topbar */}
-          <div className="relative z-10 flex h-16 flex-shrink-0 border-b border-gray-200 bg-white glass-morphism">
-            <button
-              type="button"
-              className="px-4 text-gray-500 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-blue-500 lg:hidden"
-              onClick={() => setSidebarOpen(true)}
-              aria-label="Open sidebar"
-            >
-              <Menu className="h-6 w-6" />
-            </button>
-            
-            <div className="flex flex-1 justify-between px-4 sm:px-6 lg:px-8">
-              <div className="flex flex-1 items-center">
-                <div className="w-full max-w-2xl lg:max-w-none">
-                  <div className="relative text-gray-400 focus-within:text-gray-500">
-                    <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
-                      <Search className="h-5 w-5" />
-                    </div>
-                    <input
-                      id="search"
-                      name="search"
-                      className="block w-full rounded-md border-0 bg-white/80 py-2 pl-10 pr-3 text-gray-900 focus:ring-2 focus:ring-blue-500 sm:text-sm"
-                      placeholder="Search"
-                      type="search"
-                    />
-                  </div>
+        <div className="flex flex-col flex-1 overflow-hidden">
+          {/* Top navigation */}
+          <header className="flex justify-between items-center p-4 border-b bg-white shadow-sm">
+            <div className="flex items-center">
+              <button
+                onClick={() => setSidebarOpen(true)}
+                className="lg:hidden p-2 rounded-md text-gray-500 hover:text-gray-600 hover:bg-gray-100 focus:outline-none"
+              >
+                <Menu className="h-6 w-6" />
+              </button>
+              <div className="ml-4 lg:ml-0 flex items-center">
+                <div className="h-10 w-10 rounded-md bg-gradient-to-br from-blue-500 to-blue-600 p-1.5 mr-2 flex items-center justify-center overflow-hidden">
+                  <img 
+                    src="/assets/logo-white.png" 
+                    alt="TSA Logo" 
+                    className="h-7 w-7 object-contain"
+                    style={{ filter: 'brightness(0) invert(1)' }}
+                  />
                 </div>
+                <h1 className="text-xl font-bold text-gray-800">Admin Hub</h1>
               </div>
+            </div>
+
+            <div className="flex items-center space-x-4">
+              {/* Search button */}
+              <button className="p-2 rounded-md text-gray-500 hover:text-gray-600 hover:bg-gray-100 focus:outline-none">
+                <Search className="h-5 w-5" />
+              </button>
               
-              <div className="ml-4 flex items-center md:ml-6 space-x-2">
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="text-gray-400 hover:text-gray-500"
-                  onClick={() => navigate('/dashboard/forum')}
-                >
-                  <MessageSquare className="h-5 w-5" />
-                </Button>
-                
-                <button
-                  type="button"
-                  className="rounded-full bg-white p-1 text-gray-400 hover:text-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                >
-                  <span className="sr-only">View notifications</span>
-                  <Bell className="h-6 w-6" />
-                </button>
+              {/* Notifications */}
+              <button className="p-2 rounded-md text-gray-500 hover:text-gray-600 hover:bg-gray-100 focus:outline-none relative">
+                <Bell className="h-5 w-5" />
+                <span className="absolute top-1 right-1 h-2 w-2 rounded-full bg-red-500"></span>
+              </button>
+              
+              {/* Messages */}
+              <button className="p-2 rounded-md text-gray-500 hover:text-gray-600 hover:bg-gray-100 focus:outline-none">
+                <MessageSquare className="h-5 w-5" />
+              </button>
 
-                {/* Profile dropdown */}
-                <div className="ml-3 relative">
-                  <div className="flex items-center">
-                    <button
-                      type="button"
-                      className="flex max-w-xs items-center rounded-full bg-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
-                    >
-                      <span className="sr-only">Open user menu</span>
-                      <div className="h-8 w-8 rounded-full bg-gradient-to-r from-blue-500 to-blue-600 flex items-center justify-center text-white font-medium">
-                        U
-                      </div>
-                    </button>
-                    
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="ml-2 text-gray-400 hover:text-gray-500"
-                      onClick={handleSignOut}
-                    >
-                      <LogOut className="h-5 w-5" />
-                    </Button>
-                  </div>
-                </div>
-              </div>
+              {/* User menu */}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" className="relative h-10 w-10 rounded-full">
+                    <Avatar>
+                      <AvatarFallback className="bg-blue-100 text-blue-800">
+                        {getUserInitials()}
+                      </AvatarFallback>
+                    </Avatar>
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-56">
+                  <DropdownMenuLabel>
+                    <div className="flex flex-col">
+                      <span className="font-medium">
+                        {userProfile?.firstName} {userProfile?.lastName}
+                      </span>
+                      <span className="text-xs text-gray-500">
+                        {userProfile?.departmentName || 'No Department'}
+                      </span>
+                    </div>
+                  </DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={() => navigate(getProfileUrl())}>
+                    <UserCircle className="mr-2 h-4 w-4" />
+                    <span>My Profile</span>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => navigate(`${getBasePath()}/settings`)}>
+                    <Settings className="mr-2 h-4 w-4" />
+                    <span>Settings</span>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => navigate('/dashboard/debug')}>
+                    <User className="mr-2 h-4 w-4" />
+                    <span>Debug Auth</span>
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={handleSignOut}>
+                    <LogOut className="mr-2 h-4 w-4" />
+                    <span>Sign out</span>
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
-          </div>
+          </header>
 
-          {/* Main content */}
-          <motion.main 
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ duration: 0.5 }}
-            className="flex-1 overflow-y-auto bg-gradient-to-br from-blue-50 to-gray-50 focus:outline-none"
-          >
-            <div className="py-4 px-4 sm:px-6 lg:px-8">
-              {children}
-            </div>
-          </motion.main>
+          {/* Page content */}
+          <main className="flex-1 overflow-y-auto p-4 bg-gradient-to-br from-blue-50 to-gray-50">
+            {children}
+          </main>
         </div>
       </div>
     </div>

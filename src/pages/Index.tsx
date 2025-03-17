@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
@@ -11,13 +10,16 @@ const Index = () => {
           <div className="flex h-16 justify-between">
             <div className="flex">
               <div className="flex flex-shrink-0 items-center">
-                <div className="h-8 w-8 rounded-md bg-gradient-to-br from-blue-500 to-blue-600 p-1 shadow-md">
-                  <div className="h-full w-full flex items-center justify-center text-white text-xs font-bold">
-                    AF
-                  </div>
+                <div className="h-10 w-10 rounded-md bg-gradient-to-br from-blue-500 to-blue-600 p-1.5 shadow-md flex items-center justify-center overflow-hidden">
+                  <img 
+                    src="/assets/logo-white.png" 
+                    alt="TSA Logo" 
+                    className="h-7 w-7 object-contain"
+                    style={{ filter: 'brightness(0) invert(1)' }}
+                  />
                 </div>
                 <span className="ml-3 text-xl font-semibold text-gray-900">
-                  Admin Finance
+                  Admin Portal
                 </span>
               </div>
             </div>
@@ -44,11 +46,14 @@ const Index = () => {
             initial={{ scale: 0.9, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
             transition={{ duration: 0.5, delay: 0.2 }}
-            className="mx-auto h-24 w-24 rounded-2xl bg-gradient-to-br from-blue-500 to-blue-600 p-3 shadow-lg mb-6"
+            className="mx-auto h-28 w-28 rounded-2xl bg-gradient-to-br from-blue-500 to-blue-600 p-3 shadow-lg mb-6 flex items-center justify-center overflow-hidden"
           >
-            <div className="h-full w-full flex items-center justify-center text-white text-2xl font-bold">
-              AF
-            </div>
+            <img 
+              src="/assets/logo-white.png" 
+              alt="TSA Logo" 
+              className="h-22 w-22 object-contain"
+              style={{ filter: 'brightness(0) invert(1)' }}
+            />
           </motion.div>
 
           <motion.h1
@@ -151,7 +156,7 @@ const Index = () => {
           </div>
           <div className="mt-8 md:order-1 md:mt-0">
             <p className="text-center text-base text-gray-400">
-              &copy; 2023 Admin Finance Hub. All rights reserved.
+              &copy; 2025 tSa Supplies. All rights reserved.
             </p>
           </div>
         </div>

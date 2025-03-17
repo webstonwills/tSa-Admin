@@ -1,4 +1,3 @@
-
 import React from 'react';
 import AuthLayout from '@/components/layout/AuthLayout';
 import SignupForm from '@/components/auth/SignupForm';
@@ -14,9 +13,9 @@ const Signup = () => {
       <div className="mb-6 space-y-4">
         <div className="flex justify-center space-x-8">
           {[
-            { icon: Building, text: 'Department Assignment' },
+            { icon: Building, text: 'Department ID' },
             { icon: Lock, text: 'Secure Signup' },
-            { icon: ShieldCheck, text: 'Role-based Access' },
+            { icon: ShieldCheck, text: 'Role Access' },
           ].map((item, index) => (
             <motion.div
               key={index}
@@ -39,15 +38,15 @@ const Signup = () => {
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.5 }}
-          className="rounded-md bg-amber-50 p-4 dark:bg-amber-900/20"
+          className="rounded-md bg-blue-50 p-3 border border-blue-100 shadow-sm mt-2"
         >
           <div className="flex">
             <div className="flex-shrink-0">
-              <AlertCircle className="h-5 w-5 text-amber-400" aria-hidden="true" />
+              <AlertCircle className="h-5 w-5 text-blue-600" aria-hidden="true" />
             </div>
-            <div className="ml-3 flex-1 md:flex md:justify-between">
-              <p className="text-sm text-amber-700 dark:text-amber-300">
-                All departments have been pre-registered. Your unique department ID will be generated based on your selection.
+            <div className="ml-3 flex-1">
+              <p className="text-xs font-medium text-blue-700 leading-relaxed">
+                Complete the form below to create your account and get access to your dashboard.
               </p>
             </div>
           </div>

@@ -138,6 +138,10 @@ export type Database = {
           last_name: string | null
           role: string
           updated_at: string
+          approval_status: string
+          approved_by: string | null
+          approval_date: string | null
+          rejection_reason: string | null
         }
         Insert: {
           created_at?: string
@@ -148,6 +152,10 @@ export type Database = {
           last_name?: string | null
           role: string
           updated_at?: string
+          approval_status?: string
+          approved_by?: string | null
+          approval_date?: string | null
+          rejection_reason?: string | null
         }
         Update: {
           created_at?: string
@@ -158,6 +166,10 @@ export type Database = {
           last_name?: string | null
           role?: string
           updated_at?: string
+          approval_status?: string
+          approved_by?: string | null
+          approval_date?: string | null
+          rejection_reason?: string | null
         }
         Relationships: [
           {

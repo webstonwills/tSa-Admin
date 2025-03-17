@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
@@ -19,15 +18,20 @@ const AuthLayout: React.FC<AuthLayoutProps> = ({ children, title, subtitle }) =>
         className="w-full max-w-md space-y-8"
       >
         <div className="text-center">
-          <Link to="/" className="inline-block">
+          <Link to="/auth/login" className="inline-block">
             <motion.div 
               initial={{ scale: 0.9 }}
               animate={{ scale: 1 }}
               transition={{ duration: 0.5, ease: [0.34, 1.56, 0.64, 1] }}
-              className="h-14 w-14 rounded-xl bg-gradient-to-br from-blue-500 to-blue-600 p-2 mx-auto shadow-lg mb-3"
+              className="mb-8 flex justify-center"
             >
-              <div className="h-full w-full flex items-center justify-center text-white text-xl font-bold">
-                AF
+              <div className="h-28 w-28 rounded-xl bg-gradient-to-br from-blue-500 to-blue-600 p-3 shadow-lg flex items-center justify-center overflow-hidden">
+                <img 
+                  src="/assets/logo-white.png" 
+                  alt="TSA Logo" 
+                  className="h-22 w-22 object-contain"
+                  style={{ filter: 'brightness(0) invert(1)' }}
+                />
               </div>
             </motion.div>
           </Link>

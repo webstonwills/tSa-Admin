@@ -17,7 +17,8 @@ import {
   Briefcase,
   Heart,
   Vote,
-  MessageSquare
+  MessageSquare,
+  UserCheck
 } from 'lucide-react';
 import { useIsMobile } from '@/hooks/use-mobile';
 
@@ -104,6 +105,12 @@ const navigation: NavItem[] = [
     icon: <Settings className="h-5 w-5" />,
     href: '/settings',
     roles: ['ceo', 'finance', 'treasurer', 'audit', 'hr', 'operations', 'marketing', 'sec', 'fin', 'bm', 'aud', 'wel', 'bmem'],
+  },
+  {
+    name: 'Registration Approval',
+    icon: <UserCheck className="h-5 w-5" />,
+    href: '/dashboard/registration-approval',
+    roles: ['ceo', 'admin'],
   },
 ];
 
