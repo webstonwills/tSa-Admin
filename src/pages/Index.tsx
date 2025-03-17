@@ -12,7 +12,7 @@ const Index = () => {
               <div className="flex flex-shrink-0 items-center">
                 <div className="h-10 w-10 rounded-md bg-gradient-to-br from-blue-500 to-blue-600 p-1.5 shadow-md flex items-center justify-center overflow-hidden">
                   <img 
-                    src={`${import.meta.env.BASE_URL}assets/logo-white.png`}
+                    src="/tSa-Admin/assets/logo-white.png" 
                     alt="TSA Logo" 
                     className="h-7 w-7 object-contain"
                     style={{ filter: 'brightness(0) invert(1)' }}
@@ -49,7 +49,7 @@ const Index = () => {
             className="mx-auto h-28 w-28 rounded-2xl bg-gradient-to-br from-blue-500 to-blue-600 p-3 shadow-lg mb-6 flex items-center justify-center overflow-hidden"
           >
             <img 
-              src={`${import.meta.env.BASE_URL}assets/logo-white.png`}
+              src="/tSa-Admin/assets/logo-white.png" 
               alt="TSA Logo" 
               className="h-22 w-22 object-contain"
               style={{ filter: 'brightness(0) invert(1)' }}
