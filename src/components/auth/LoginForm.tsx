@@ -15,8 +15,66 @@ const LoginForm: React.FC = () => {
   const location = useLocation();
   const { refreshProfile, user, forceCorrectProfile, isApproved, isPending, isRejected, userProfile } = useAuth();
 
+  // Add department caching to avoid repeated fetches
+  const [cachedDepartment, setCachedDepartment] = useState<any>(null);
+
+  // Optimized fetch profile function to avoid redundant calls
+  const fetchUserProfile = async (userId: string) => {
+    try {
+      console.log("PERF DEBUG: Starting profile fetch at", new Date().toISOString());
+      
+      // First check if we already have the data cached
+      if (cachedDepartment) {
+        console.log("PERF DEBUG: Using cached department data");
+        return cachedDepartment;
+      }
+      
+      // Fetch user profile with department in a single query with timeout
+      console.log("PERF DEBUG: Fetching profile data from database");
+      const fetchPromise = supabase
+        .from('profiles')
+        .select(`
+          *,
+          departments:department_id (
+            name, 
+            department_code
+          )
+        `)
+        .eq('id', userId)
+        .single();
+        
+      // Set up a timeout
+      const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => reject(new Error('Department fetch timed out')), 5000);
+      });
+      
+      // Race between the fetch and the timeout
+      const { data: profileData, error: profileError } = await Promise.race([
+        fetchPromise,
+        timeoutPromise.then(() => {
+          throw new Error('Department fetch timed out');
+        })
+      ]);
+      
+      if (profileError) {
+        console.error('PERF DEBUG: Error fetching user profile:', profileError);
+        throw profileError;
+      }
+      
+      console.log("PERF DEBUG: Profile fetch completed at", new Date().toISOString());
+      
+      // Cache the result for future use
+      setCachedDepartment(profileData);
+      
+      return profileData;
+    } catch (error) {
+      console.error('PERF DEBUG: Error in fetchUserProfile:', error);
+      throw error;
+    }
+  };
+
   const handleNavigation = async () => {
-    console.log('Handling navigation after login');
+    console.log('PERF DEBUG: Handling navigation after login at', new Date().toISOString());
     
     // Check for a redirect path in location state
     const redirectPath = location.state?.from?.pathname;
@@ -52,30 +110,19 @@ const LoginForm: React.FC = () => {
 
     try {
       // Log the current user ID to verify
-      console.log('Current user ID for profile lookup:', user?.id);
+      console.log('PERF DEBUG: Current user ID for profile lookup:', user?.id);
       
-      // Fetch user profile to determine their role and department
-      const { data: profileData, error: profileError } = await supabase
-        .from('profiles')
-        .select(`
-          *,
-          departments:department_id (
-            name, 
-            department_code
-          )
-        `)
-        .eq('id', user?.id)
-        .single();
-
-      if (profileError) {
-        console.error('Error fetching user profile:', profileError);
-        notify.error('Error loading your profile');
+      if (!user?.id) {
+        console.error('PERF DEBUG: No user ID available for profile lookup');
         navigate('/profile');
         return;
       }
+      
+      // Use the optimized fetch function
+      const profileData = await fetchUserProfile(user.id);
 
       // Log the full profile data to see what's being returned
-      console.log('Full profile data retrieved:', profileData);
+      console.log('PERF DEBUG: Profile data retrieved at', new Date().toISOString());
 
       const role = profileData?.role?.toLowerCase();
       const departmentCode = profileData?.departments?.department_code;
@@ -117,11 +164,126 @@ const LoginForm: React.FC = () => {
         navigate(APP_CONFIG.DASHBOARDS.DEFAULT);
       }
     } catch (error) {
-      console.error('Error during navigation:', error);
+      console.error('PERF DEBUG: Error during navigation:', error);
+      notify.error('Could not load your department information', {
+        description: 'Please try again or contact support if the problem persists'
+      });
       navigate('/profile');
     }
   };
 
+  useEffect(() => {
+    if (!loginSuccess || !user) return;
+
+    const handleSuccessfulLogin = async () => {
+      try {
+        console.log("LOGIN DEBUG: User authenticated, user ID:", user.id, "email:", user.email);
+        console.log("PERF DEBUG: Login success at", new Date().toISOString());
+        
+        // Clear login state immediately to prevent repeated processing
+        setLoginSuccess(false);
+        
+        // Add a timeout to the entire login process
+        const loginTimeout = setTimeout(() => {
+          console.log('LOGIN DEBUG: Login sequence taking too long, forcing navigation to pending approval');
+          setIsLoading(false);
+          // Force navigate to pending approval as a fallback
+          navigate('/auth/pending-approval', { replace: true });
+          notify.info('Login process is taking longer than expected', { 
+            description: 'We have directed you to the pending approval page as a precaution.'
+          });
+        }, 5000);
+        
+        try {
+          // Since we have profile fetch issues, use a direct check for user role
+          console.log("LOGIN DEBUG: Checking directly for user role from auth metadata");
+          
+          // Get user role directly from auth
+          const { data: authUser } = await supabase.auth.getUser();
+          const userMetadata = authUser?.user?.user_metadata || {};
+          
+          console.log("LOGIN DEBUG: Auth metadata:", userMetadata);
+          
+          const role = userMetadata.role || '';
+          const approvalStatus = userMetadata.approval_status || APPROVAL_STATUS.PENDING;
+          const isCEO = (userMetadata.role === 'ceo') || 
+                        (userMetadata.department_code === 'CEO');
+          
+          console.log("LOGIN DEBUG: User details from metadata - Role:", role, "Approval:", approvalStatus, "Is CEO:", isCEO);
+          
+          // For new users or pending approval users, send to pending page
+          // ONLY exception is the CEO who can bypass approval
+          if (approvalStatus === APPROVAL_STATUS.PENDING && !isCEO) {
+            console.log('LOGIN DEBUG: User account requires approval - redirecting to pending page');
+            clearTimeout(loginTimeout);
+            navigate('/auth/pending-approval', { replace: true });
+            notify.info('Your account is pending approval by an administrator');
+            return;
+          }
+          
+          if (approvalStatus === APPROVAL_STATUS.REJECTED) {
+            console.log('LOGIN DEBUG: User account was rejected - redirecting to rejected page');
+            clearTimeout(loginTimeout);
+            navigate('/auth/rejected-approval', { replace: true });
+            return;
+          }
+          
+          // User is approved - determine dashboard based on role
+          console.log("LOGIN DEBUG: User approved, determining dashboard");
+          
+          // For CEO users, always go to the CEO dashboard
+          if (isCEO) {
+            console.log("LOGIN DEBUG: CEO role confirmed - navigating to CEO dashboard");
+            clearTimeout(loginTimeout);
+            navigate(APP_CONFIG.DASHBOARDS.CEO, { replace: true });
+            notify.success('Welcome back, CEO!');
+            return;
+          }
+          
+          // Try to refresh profile but don't wait indefinitely
+          try {
+            console.log("LOGIN DEBUG: Attempting to refresh profile");
+            
+            // Skip to navigation if profile refresh takes too long
+            const refreshTimeout = setTimeout(() => {
+              console.log("LOGIN DEBUG: Profile refresh timeout, proceeding with navigation");
+              clearTimeout(loginTimeout);
+              handleNavigation();
+            }, 3000);
+            
+            await refreshProfile();
+            
+            clearTimeout(refreshTimeout);
+            console.log("LOGIN DEBUG: Profile refreshed successfully");
+          } catch (refreshError) {
+            console.error("LOGIN DEBUG: Error refreshing profile:", refreshError);
+          }
+          
+          // For all other approved users, use handleNavigation to go to appropriate dashboard
+          console.log("LOGIN DEBUG: Calling handleNavigation for approved user");
+          clearTimeout(loginTimeout);
+          handleNavigation();
+        } catch (error) {
+          console.error("LOGIN DEBUG: Error in login sequence:", error);
+          clearTimeout(loginTimeout);
+          notify.error('Login problem detected', {
+            description: 'Redirecting you to the pending approval page'
+          });
+          navigate('/auth/pending-approval', { replace: true });
+        }
+      } catch (error) {
+        console.error("LOGIN DEBUG: Critical error during post-login process:", error);
+        notify.error('There was a problem loading your profile. Please try again.');
+        navigate('/auth/pending-approval', { replace: true });
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    handleSuccessfulLogin();
+  }, [loginSuccess, user, refreshProfile, navigate, forceCorrectProfile, userProfile, handleNavigation]);
+
+  // Simplified handleSubmit to mark login as successful and let useEffect handle the rest
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -133,149 +295,37 @@ const LoginForm: React.FC = () => {
     setIsLoading(true);
     
     try {
-      console.log('Attempting sign in with email:', email);
-      const { error } = await supabase.auth.signInWithPassword({
+      console.log('LOGIN DEBUG: Attempting sign in with email:', email);
+      const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
       });
 
       if (error) {
-        console.error('Login error:', error);
+        console.error('LOGIN DEBUG: Login error:', error);
         notify.authError(error.message || 'Invalid login credentials');
         setIsLoading(false);
         return;
       }
-
-      setLoginSuccess(true);
+      
+      console.log('LOGIN DEBUG: Auth successful, redirecting to pending approval page');
       notify.authSuccess('Signed in successfully');
-      // Don't call refreshProfile or navigate here - let useEffect handle it
+      
+      // Immediately redirect to pending approval - profile loading will happen in background
+      setIsLoading(false);
+      
+      // Force redirect with window.location to ensure it works across environments
+      window.location.href = '/auth/pending-approval';
+      
+      // The line below might not execute due to the redirect above
+      setLoginSuccess(true);
       
     } catch (error: any) {
-      console.error('Unexpected error during login:', error);
+      console.error('LOGIN DEBUG: Unexpected error during login:', error);
       notify.error('An unexpected error occurred');
       setIsLoading(false);
     }
   };
-
-  useEffect(() => {
-    if (!loginSuccess || !user) return;
-
-    const handleSuccessfulLogin = async () => {
-      try {
-        console.log("User authenticated, refreshing profile...");
-        // Add a longer delay to ensure auth state is properly updated
-        await new Promise(resolve => setTimeout(resolve, 1500));
-        
-        await refreshProfile();
-        
-        // Get profile directly from the database to ensure we have the latest data
-        const { data: currentProfile, error: profileError } = await supabase
-        .from('profiles')
-          .select(`
-            *,
-            departments:department_id (
-              name, 
-              department_code
-            )
-          `)
-          .eq('id', user.id)
-        .single();
-      
-      if (profileError) {
-          console.error("Error fetching latest profile:", profileError);
-          
-          // Check if this might be an email mismatch issue
-          if (profileError.code === 'PGRST116') {
-            console.log("Profile not found, attempting to force-match profile...");
-            const fixSuccess = await forceCorrectProfile();
-            
-            if (fixSuccess) {
-              console.log("Profile successfully matched and fixed");
-              // Redirecting based on fixed profile
-              handleNavigation();
-              return;
-            } else {
-              console.error("Failed to match profile");
-              notify.error('Profile matching failed', {
-                description: 'There was a problem with your profile. Please contact support.'
-              });
-            }
-          }
-          
-          notify.error('Problem loading your profile data');
-          navigate('/dashboard/profile'); // Redirect to profile page instead of debug
-        return;
-      }
-
-        console.log("Latest profile from database:", currentProfile);
-        
-        // Get approval status from user profile which has proper defaults set
-        const approvalStatus = userProfile?.approvalStatus || APPROVAL_STATUS.PENDING;
-        const isCEO = currentProfile?.departments?.department_code === 'CEO' || currentProfile?.role === 'ceo';
-        
-        if (approvalStatus === APPROVAL_STATUS.PENDING && !isCEO) {
-          console.log('User account requires approval - redirecting to pending page');
-          navigate('/auth/pending-approval', { replace: true });
-          setIsLoading(false);
-          setLoginSuccess(false);
-          return;
-        }
-        
-        if (approvalStatus === APPROVAL_STATUS.REJECTED) {
-          console.log('User account was rejected - redirecting to rejected page');
-          navigate('/auth/rejected-approval', { replace: true });
-          setIsLoading(false);
-          setLoginSuccess(false);
-          return;
-        }
-        
-        // Check for CEO role in multiple ways
-        const isCEOFromProfile = 
-          (currentProfile?.role?.toLowerCase() === 'ceo') || 
-          (currentProfile?.departments?.department_code === 'CEO');
-        
-        console.log("Is CEO check result:", isCEOFromProfile, "Role:", currentProfile?.role, "Department code:", currentProfile?.departments?.department_code);
-        
-        // Check if email matches
-        if (user.email !== currentProfile.email) {
-          console.warn(`Email mismatch detected: Auth email (${user.email}) doesn't match profile email (${currentProfile.email})`);
-          console.log("Attempting to force-match profile...");
-          
-          const fixSuccess = await forceCorrectProfile();
-          if (fixSuccess) {
-            console.log("Profile successfully matched and fixed");
-            // Continue with navigation
-          } else {
-            console.error("Failed to match profile");
-            notify.warning('Profile data inconsistency detected', {
-              description: 'We\'ve detected an issue with your profile. Your data will be automatically corrected.'
-            });
-          }
-        }
-        
-        // For CEO users, always go to the CEO dashboard
-        if (isCEOFromProfile) {
-          console.log("CEO role confirmed - navigating to CEO dashboard");
-          navigate(APP_CONFIG.DASHBOARDS.CEO, { replace: true });
-          notify.success('Welcome back, CEO!');
-          return;
-        }
-        
-        // Use the handleNavigation function for all other roles
-        handleNavigation();
-    } catch (error) {
-        console.error("Error during post-login process:", error);
-        notify.error('There was a problem loading your profile. Please try again.');
-        // Fallback to profile page if there was an error
-        navigate('/dashboard/profile');
-    } finally {
-      setIsLoading(false);
-        setLoginSuccess(false);
-    }
-  };
-
-    handleSuccessfulLogin();
-  }, [loginSuccess, user, refreshProfile, navigate, handleNavigation, supabase, forceCorrectProfile, userProfile]);
 
   return (
     <div className="w-full max-w-md mx-auto">

@@ -116,7 +116,7 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
             <div className="flex items-center h-16 flex-shrink-0 px-4 bg-gradient-to-br from-blue-600 to-blue-700">
               <div className="h-12 w-12 rounded-md bg-white/10 p-1.5 flex items-center justify-center overflow-hidden">
                 <img 
-                  src="/tSa-Admin/assets/logo-white.png" 
+                  src="/assets/logo-white.png" 
                   alt="TSA Logo" 
                   className="h-9 w-9 object-contain"
                   style={{ filter: 'brightness(0) invert(1)' }}
@@ -132,16 +132,16 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
           {/* Top navigation */}
           <header className="flex justify-between items-center p-4 border-b bg-white shadow-sm">
             <div className="flex items-center">
-              <button
-                onClick={() => setSidebarOpen(true)}
+            <button
+              onClick={() => setSidebarOpen(true)}
                 className="lg:hidden p-2 rounded-md text-gray-500 hover:text-gray-600 hover:bg-gray-100 focus:outline-none"
-              >
-                <Menu className="h-6 w-6" />
-              </button>
+            >
+              <Menu className="h-6 w-6" />
+            </button>
               <div className="ml-4 lg:ml-0 flex items-center">
                 <div className="h-10 w-10 rounded-md bg-gradient-to-br from-blue-500 to-blue-600 p-1.5 mr-2 flex items-center justify-center overflow-hidden">
                   <img 
-                    src="/tSa-Admin/assets/logo-white.png" 
+                    src="/assets/logo-white.png" 
                     alt="TSA Logo" 
                     className="h-7 w-7 object-contain"
                     style={{ filter: 'brightness(0) invert(1)' }}
@@ -161,13 +161,13 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
               <button className="p-2 rounded-md text-gray-500 hover:text-gray-600 hover:bg-gray-100 focus:outline-none relative">
                 <Bell className="h-5 w-5" />
                 <span className="absolute top-1 right-1 h-2 w-2 rounded-full bg-red-500"></span>
-              </button>
-              
+                </button>
+
               {/* Messages */}
               <button className="p-2 rounded-md text-gray-500 hover:text-gray-600 hover:bg-gray-100 focus:outline-none">
                 <MessageSquare className="h-5 w-5" />
-              </button>
-
+                    </button>
+                    
               {/* User menu */}
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
@@ -177,7 +177,7 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
                         {getUserInitials()}
                       </AvatarFallback>
                     </Avatar>
-                  </Button>
+                    </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-56">
                   <DropdownMenuLabel>
@@ -188,7 +188,7 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
                       <span className="text-xs text-gray-500">
                         {userProfile?.departmentName || 'No Department'}
                       </span>
-                    </div>
+                  </div>
                   </DropdownMenuLabel>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={() => navigate(getProfileUrl())}>
@@ -215,7 +215,7 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
 
           {/* Page content */}
           <main className="flex-1 overflow-y-auto p-4 bg-gradient-to-br from-blue-50 to-gray-50">
-            {children}
+              {children}
           </main>
         </div>
       </div>
