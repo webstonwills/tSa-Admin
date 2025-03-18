@@ -50,5 +50,5 @@ export default defineConfig(({ mode }) => ({
     // Define any global constants here
     // Example: 'process.env.NODE_ENV': JSON.stringify(process.env.NODE_ENV)
   },
-  base: '/tSa-Admin/',
+  base: '/',
 }));
