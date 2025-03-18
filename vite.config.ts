@@ -40,7 +40,6 @@ export default defineConfig(({ mode }) => ({
       },
     },
     minify: 'esbuild',
-    assetsDir: '',
   },
   optimizeDeps: {
     include: ['react', 'react-dom', 'react-router-dom', '@supabase/supabase-js'],
@@ -48,7 +47,8 @@ export default defineConfig(({ mode }) => ({
   },
   define: {
     // Define any global constants here
-    // Example: 'process.env.NODE_ENV': JSON.stringify(process.env.NODE_ENV)
+    'process.env.NODE_ENV': JSON.stringify(mode),
+    'import.meta.env.VITE_APP_VERSION': JSON.stringify(process.env.npm_package_version),
   },
   base: '/',
 }));
