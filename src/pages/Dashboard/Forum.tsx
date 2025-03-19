@@ -533,7 +533,7 @@ export default function Chat() {
         
         {/* Messages area - expanded to fill available space */}
         <ScrollArea className="flex-1 p-4 overflow-y-auto" ref={scrollAreaRef}>
-          {loading ? (
+        {loading ? (
             <div className="flex justify-center items-center h-full">
               <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
             </div>
@@ -565,8 +565,8 @@ export default function Chat() {
                       </div>
                     )}
                     
-                    <div className={`group flex ${currentUserMessage ? 'justify-end' : 'justify-start'} relative w-full mb-2`}>
-                      {/* User avatar - only show on left for other users' messages */}
+                    <div className={`group flex ${currentUserMessage ? 'justify-end' : 'justify-start'} relative w-full mb-3`}>
+                      {/* User avatar - only show for other users' messages */}
                       {!currentUserMessage && (
                         <div className="flex-shrink-0 mr-2 self-end mb-1">
                           <Avatar className="h-8 w-8 ring-2 ring-background">
@@ -578,11 +578,11 @@ export default function Chat() {
                         </div>
                       )}
                       
-                      <div className={`flex flex-col max-w-[75%] md:max-w-[60%] ${currentUserMessage ? '' : ''}`}>
-                        {/* User name - only show for new sender */}
+                      <div className={`flex flex-col ${currentUserMessage ? 'max-w-[75%] md:max-w-[60%]' : 'max-w-[75%] md:max-w-[60%] ml-1'}`}>
+                        {/* User name - show "You" for current user, name for others */}
                         {isNewSender && (
-                          <span className={`text-xs mb-1 ${currentUserMessage ? 'text-right' : 'text-left'} text-muted-foreground`}>
-                            {message.profile?.full_name || 'Unknown User'}
+                          <span className={`text-xs mb-1 ${currentUserMessage ? 'text-right mr-1' : 'text-left ml-1'} text-muted-foreground`}>
+                            {currentUserMessage ? 'You' : (message.profile?.full_name || 'Unknown User')}
                           </span>
                         )}
                         
@@ -594,7 +594,7 @@ export default function Chat() {
                             <Reply className="h-3 w-3 mt-0.5 flex-shrink-0" />
                             <div className="overflow-hidden">
                               <div className="font-medium text-xs">
-                                {message.reply_to.profile?.full_name || 'Unknown User'}
+                                {message.reply_to.user_id === user?.id ? 'You' : (message.reply_to.profile?.full_name || 'Unknown User')}
                               </div>
                               <div className="truncate">{message.reply_to.content}</div>
                             </div>
@@ -661,18 +661,6 @@ export default function Chat() {
                           </div>
                         )}
                       </div>
-                      
-                      {/* User avatar - only show on right for current user's messages */}
-                      {currentUserMessage && (
-                        <div className="flex-shrink-0 ml-2 self-end mb-1">
-                          <Avatar className="h-8 w-8 ring-2 ring-background">
-                            <AvatarImage src={message.profile?.avatar_url || ''} />
-                            <AvatarFallback className="bg-blue-600">
-                              {getInitials(message)}
-                            </AvatarFallback>
-                          </Avatar>
-                        </div>
-                      )}
                     </div>
                   </React.Fragment>
                 );
@@ -689,8 +677,8 @@ export default function Chat() {
                   Someone is typing...
                 </div>
               )}
-            </div>
-          ) : (
+          </div>
+        ) : (
             <div className="flex justify-center items-center h-full text-muted-foreground">
               No messages yet. Start the conversation!
             </div>
@@ -719,8 +707,8 @@ export default function Chat() {
               >
                 <X className="h-4 w-4" />
               </Button>
-            </div>
-          )}
+                  </div>
+                )}
           
           <div className="flex items-end gap-2">
             <div className="flex-1 relative">
