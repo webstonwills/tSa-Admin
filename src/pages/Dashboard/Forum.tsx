@@ -24,6 +24,9 @@ interface Message {
     avatar_url: string;
   };
   reply_to?: Message;
+  reactions?: {
+    [key: string]: string[];
+  };
 }
 
 // Array of colors for user avatars
@@ -39,6 +42,12 @@ const userColors = [
   "bg-teal-600",
 ];
 
+// Message bubble colors for different users
+const messageBubbleColors = {
+  self: "bg-primary text-primary-foreground",
+  others: "bg-muted"
+};
+
 export default function Chat() {
   // State variables
   const { user } = useAuth();
@@ -52,6 +61,8 @@ export default function Chat() {
   const [unreadCount, setUnreadCount] = useState(0);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const [userReady, setUserReady] = useState(false);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   
   // User color mapping
   const userColorMap = useRef(new Map<string, string>());
@@ -381,6 +392,44 @@ export default function Chat() {
     }
   };
 
+  // Function to add emoji reaction
+  const addReaction = async (messageId: string, emoji: string) => {
+    try {
+      // This is a mock implementation since we'd need to update the DB schema
+      // In a real implementation, you'd store reactions in the database
+      const updatedMessages = messages.map(m => {
+        if (m.id === messageId) {
+          const currentReactions = m.reactions || {};
+          const currentUsers = currentReactions[emoji] || [];
+          
+          // Add user to reaction if not already reacted
+          if (!currentUsers.includes(user?.id || '')) {
+            return {
+              ...m,
+              reactions: {
+                ...currentReactions,
+                [emoji]: [...currentUsers, user?.id || '']
+              }
+            };
+          }
+        }
+        return m;
+      });
+      
+      setMessages(updatedMessages);
+      
+      // In a real implementation:
+      // await supabase.from('message_reactions').insert({
+      //   message_id: messageId,
+      //   user_id: user?.id,
+      //   emoji: emoji
+      // });
+      
+    } catch (error) {
+      console.error('Error adding reaction:', error);
+    }
+  };
+
   // Force refresh authentication
   const refreshAuth = async () => {
     try {
@@ -414,13 +463,21 @@ export default function Chat() {
     }
   };
 
+  // Function to handle key press in the textarea
+  const handleKeyPress = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handleSendMessage();
+    }
+  };
+
   return (
     <div className="h-full flex flex-col">
       {/* The main chat content - exclude the header that's already in the dashboard layout */}
-      <div className="flex-1 flex flex-col h-[calc(100vh-170px)] overflow-hidden">
+      <div className="flex-1 flex flex-col h-[calc(100vh-170px)] relative">
         {/* Auth Status Banner - show if user is not ready */}
         {!userReady && (
-          <div className="bg-amber-100 dark:bg-amber-900/30 text-amber-800 dark:text-amber-200 p-3 text-center flex flex-col gap-2">
+          <div className="bg-amber-100 dark:bg-amber-900/30 text-amber-800 dark:text-amber-200 p-3 text-center flex flex-col gap-2 sticky top-0 z-20">
             <p>Authentication issue detected. Your session may have expired.</p>
             <Button 
               variant="outline" 
@@ -459,13 +516,13 @@ export default function Chat() {
         </div>
         
         {/* Messages area - expanded to fill available space */}
-        <ScrollArea className="flex-1 p-4" ref={scrollAreaRef}>
-        {loading ? (
+        <ScrollArea className="flex-1 p-4 overflow-y-auto" ref={scrollAreaRef}>
+          {loading ? (
             <div className="flex justify-center items-center h-full">
               <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
             </div>
           ) : messages.length > 0 ? (
-            <div className="space-y-4">
+            <div className="space-y-4 pb-4">
               {messages.map((message, index) => {
                 // Check if this is the first message of the day or from this user
                 const showDateDivider = index === 0 || 
@@ -473,6 +530,7 @@ export default function Chat() {
                   !isYesterday(new Date(messages[index-1].created_at)) && isYesterday(new Date(message.created_at));
                 
                 const isNewSender = index === 0 || messages[index-1].user_id !== message.user_id;
+                const currentUserMessage = isCurrentUser(message.user_id);
                 
                 return (
                   <React.Fragment key={message.id}>
@@ -491,89 +549,92 @@ export default function Chat() {
                       </div>
                     )}
                     
-                    <div className="group relative">
-                      {/* Reply preview */}
-                      {message.reply_to && (
-                        <div className={`mb-1 p-2 bg-muted/50 rounded text-sm text-muted-foreground border-l-2 border-primary flex items-start gap-2 max-w-[85%] ${
-                          message.user_id === user?.id ? 'ml-auto' : 'ml-12'
-                        }`}>
-                          <Reply className="h-3 w-3 mt-0.5 flex-shrink-0" />
-                          <div className="overflow-hidden">
-                            <p className="font-medium text-xs">
-                              {message.reply_to.profile?.full_name || 'User'}
-                            </p>
-                            <p className="truncate">{message.reply_to.content}</p>
-                          </div>
+                    <div className={`group flex ${currentUserMessage ? 'justify-end' : 'justify-start'} relative`}>
+                      {/* User avatar - only show on left for other users' messages */}
+                      {!currentUserMessage && isNewSender && (
+                        <div className="flex-shrink-0 mr-2">
+                          <Avatar className="h-8 w-8">
+                            <AvatarImage src={message.profile?.avatar_url || ''} />
+                            <AvatarFallback className={getUserColor(message.user_id)}>
+                              {getInitials(message)}
+                            </AvatarFallback>
+                          </Avatar>
                         </div>
                       )}
                       
-                      {/* Message bubble */}
-                      <div className={cn(
-                        "flex items-start gap-2 max-w-[85%] group relative",
-                        message.user_id === user?.id ? "ml-auto flex-row-reverse" : ""
-                      )}>
-                        {/* Avatar - only show for new sender or after a time gap */}
-                        {(isNewSender || index === 0) && (
-                          <Avatar className={cn("h-8 w-8 flex-shrink-0", getUserColor(message.user_id))}>
-                            <AvatarImage
-                              src={message.profile?.avatar_url}
-                              alt={message.profile?.full_name || "User"}
-                            />
-                            <AvatarFallback>{getInitials(message)}</AvatarFallback>
-                          </Avatar>
+                      <div className={`flex flex-col max-w-[80%] ${currentUserMessage ? '' : 'ml-10'}`}>
+                        {/* User name - only show for new sender */}
+                        {isNewSender && (
+                          <span className={`text-xs mb-1 ${currentUserMessage ? 'text-right' : 'text-left'} text-muted-foreground`}>
+                            {message.profile?.full_name || 'Unknown User'}
+                          </span>
                         )}
                         
-                        {/* Message content */}
-                        <div className={cn(
-                          "rounded-lg p-3 min-w-[80px] break-words",
-                          message.user_id === user?.id 
-                            ? "bg-primary text-primary-foreground rounded-tr-none"
-                            : "bg-muted rounded-tl-none"
-                        )}>
-                          {/* Sender name - show only for first message in a group */}
-                          {(isNewSender || index === 0) && message.user_id !== user?.id && (
-                            <p className="font-medium text-xs mb-1">
-                              {message.profile?.full_name || 'User'}
-                            </p>
-                          )}
+                        {/* Reply preview */}
+                        {message.reply_to && (
+                          <div className={`mb-1 p-2 bg-muted/50 rounded text-sm text-muted-foreground border-l-2 border-primary flex items-start gap-2 ${
+                            currentUserMessage ? 'ml-auto' : ''
+                          }`}>
+                            <Reply className="h-3 w-3 mt-0.5 flex-shrink-0" />
+                            <div className="overflow-hidden">
+                              <div className="font-medium text-xs">
+                                {message.reply_to.profile?.full_name || 'Unknown User'}
+                              </div>
+                              <div className="truncate">{message.reply_to.content}</div>
+                            </div>
+                          </div>
+                        )}
+                        
+                        {/* Message bubble */}
+                        <div className={`relative group p-3 rounded-lg shadow-sm ${
+                          currentUserMessage 
+                            ? `${messageBubbleColors.self} rounded-br-none`
+                            : `${messageBubbleColors.others} rounded-bl-none`
+                        }`}>
+                          {message.content}
                           
-                          {/* Message text */}
-                          <p className="whitespace-pre-wrap">{message.content}</p>
-                          
-                          {/* Timestamp and seen status */}
-                          <div className={cn(
-                            "flex items-center justify-end gap-1 mt-1",
-                            message.user_id === user?.id 
-                              ? "text-primary-foreground/70" 
-                              : "text-muted-foreground"
-                          )}>
-                            <span className="text-[10px]">
-                              {formatMessageTime(message.created_at)}
-                            </span>
-                            
-                            {/* Show seen status for current user's messages */}
-                            {message.user_id === user?.id && (
-                              message.seen 
-                                ? <CheckCheck className="h-3 w-3" /> 
-                                : <Check className="h-3 w-3" />
+                          {/* Message timestamp */}
+                          <div className={`text-[10px] ${
+                            currentUserMessage ? 'text-right' : 'text-left'
+                          } mt-1 opacity-70`}>
+                            {formatMessageTime(message.created_at)}
+                            {currentUserMessage && message.seen && (
+                              <span className="ml-1 inline-flex">
+                                <CheckCheck className="h-3 w-3 text-blue-500" />
+                              </span>
                             )}
+                          </div>
+                          
+                          {/* Reaction and reply buttons */}
+                          <div className={`absolute ${
+                            currentUserMessage ? 'left-0 -translate-x-full' : 'right-0 translate-x-full'
+                          } top-0 hidden group-hover:flex items-center gap-1 bg-background rounded-full shadow p-1 text-muted-foreground`}>
+                            <button 
+                              className="hover:bg-muted rounded-full p-1"
+                              onClick={() => addReaction(message.id, '👍')}
+                            >
+                              <Smile className="h-3 w-3" />
+                            </button>
+                            <button 
+                              className="hover:bg-muted rounded-full p-1"
+                              onClick={() => setReplyingTo(message)}
+                            >
+                              <Reply className="h-3 w-3" />
+                            </button>
                           </div>
                         </div>
                         
-                        {/* Message actions */}
-                        <div className={cn(
-                          "absolute top-0 opacity-0 group-hover:opacity-100 transition-opacity",
-                          message.user_id === user?.id ? "left-0 transform -translate-x-full" : "right-0 transform translate-x-full"
-                        )}>
-                          <Button 
-                            size="icon" 
-                            variant="ghost" 
-                            className="h-7 w-7"
-                            onClick={() => setReplyingTo(message)}
-                          >
-                            <Reply className="h-3.5 w-3.5" />
-                          </Button>
-                        </div>
+                        {/* Reactions display */}
+                        {message.reactions && Object.keys(message.reactions).length > 0 && (
+                          <div className={`flex gap-1 mt-1 ${currentUserMessage ? 'justify-end' : 'justify-start'}`}>
+                            {Object.entries(message.reactions).map(([emoji, users]) => (
+                              <div key={`${message.id}-${emoji}`} className="bg-muted rounded-full px-2 py-0.5 text-xs flex items-center gap-1">
+                                <span>{emoji}</span>
+                                <span>{users.length}</span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
                       </div>
                     </div>
                   </React.Fragment>
@@ -582,93 +643,98 @@ export default function Chat() {
               
               {/* Typing indicators */}
               {Object.keys(typingUsers).length > 0 && (
-                <div className="flex items-center gap-2 pl-12 text-sm text-muted-foreground">
+                <div className="flex items-center gap-2 text-sm text-muted-foreground ml-10">
                   <div className="flex space-x-1">
-                    <div className="h-2 w-2 bg-muted-foreground/40 rounded-full animate-bounce [animation-delay:-0.3s]"></div>
-                    <div className="h-2 w-2 bg-muted-foreground/40 rounded-full animate-bounce [animation-delay:-0.15s]"></div>
-                    <div className="h-2 w-2 bg-muted-foreground/40 rounded-full animate-bounce"></div>
+                    <div className="h-2 w-2 rounded-full bg-muted-foreground animate-bounce"></div>
+                    <div className="h-2 w-2 rounded-full bg-muted-foreground animate-bounce" style={{ animationDelay: '0.1s' }}></div>
+                    <div className="h-2 w-2 rounded-full bg-muted-foreground animate-bounce" style={{ animationDelay: '0.2s' }}></div>
                   </div>
-                  <span>Someone is typing...</span>
+                  Someone is typing...
                 </div>
               )}
-          </div>
-        ) : (
-            <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
-              <p>No messages yet</p>
-              <p className="text-sm">Be the first to send a message!</p>
+            </div>
+          ) : (
+            <div className="flex justify-center items-center h-full text-muted-foreground">
+              No messages yet. Start the conversation!
             </div>
           )}
         </ScrollArea>
-
-        {/* Message input area - fixed at the bottom */}
-        <div className="w-full mt-auto">
+        
+        {/* Fixed input area at the bottom */}
+        <div className="border-t bg-background p-3 sticky bottom-0 left-0 right-0 z-10 shadow-[0_-2px_5px_rgba(0,0,0,0.05)]">
           {/* Reply preview */}
           {replyingTo && (
-            <div className="p-2 border-t bg-muted/50 flex items-center justify-between">
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <Reply className="h-3.5 w-3.5" />
-                <span>Replying to <span className="font-medium">{replyingTo.profile?.full_name || 'User'}</span></span>
-                <span className="truncate max-w-[150px] sm:max-w-[300px]">{replyingTo.content}</span>
+            <div className="mb-2 p-2 bg-muted/30 rounded text-sm text-muted-foreground border-l-2 border-primary flex items-center justify-between">
+              <div className="flex items-start gap-2 overflow-hidden">
+                <Reply className="h-4 w-4 mt-0.5 flex-shrink-0" />
+                <div className="overflow-hidden">
+                  <div className="font-medium text-xs">
+                    Replying to {replyingTo.profile?.full_name || 'Unknown User'}
+                  </div>
+                  <div className="truncate">{replyingTo.content}</div>
+                </div>
               </div>
-              <Button
+              <Button 
+                size="icon" 
                 variant="ghost"
-                size="icon"
                 className="h-6 w-6"
                 onClick={() => setReplyingTo(null)}
               >
-                <X className="h-3.5 w-3.5" />
+                <X className="h-4 w-4" />
               </Button>
             </div>
           )}
-
-          {/* Input box and send button */}
-          <div className="border-t p-2 sm:p-3 bg-background sticky bottom-0 left-0 right-0">
-            <div className="flex items-end gap-2">
-              <div className="flex-1 relative">
-                <Textarea
-                  id="message-input"
-                  value={messageText}
-                  onChange={(e) => setMessageText(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' && !e.shiftKey && userReady) {
-                      e.preventDefault();
-                      handleSendMessage();
-                    }
-                  }}
-                  onKeyUp={handleTyping}
-                  placeholder={userReady ? "Type a message..." : "Authentication required..."}
-                  className="min-h-[60px] max-h-[120px] resize-none pr-10 sm:min-h-[60px] focus:ring-1 focus:ring-primary"
-                  disabled={!userReady}
-                />
-                <div className="absolute bottom-2 right-2 flex items-center gap-1.5">
-                  <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-foreground" disabled={!userReady}>
-                    <Smile className="h-4 w-4" />
-                  </Button>
-                  <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-foreground" disabled={!userReady}>
-                    <Paperclip className="h-4 w-4" />
-                  </Button>
-                  <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-foreground" disabled={!userReady}>
-                    <Image className="h-4 w-4" />
-                  </Button>
-                </div>
+          
+          <div className="flex items-end gap-2">
+            <div className="flex-1 relative">
+              <Textarea
+                ref={textareaRef}
+                placeholder="Type a message..."
+                value={messageText}
+                onChange={(e) => setMessageText(e.target.value)}
+                onKeyDown={handleKeyPress}
+                onKeyUp={handleTyping}
+                className="min-h-10 max-h-32 py-2 pr-12 resize-none"
+              />
+              <div className="absolute right-2 bottom-2 flex items-center gap-1">
+                <Button 
+                  size="icon" 
+                  variant="ghost"
+                  className="h-6 w-6 text-muted-foreground hover:text-foreground"
+                  disabled={sending}
+                  onClick={() => setShowEmojiPicker(!showEmojiPicker)}
+                  type="button"
+                >
+                  <Smile className="h-4 w-4" />
+                </Button>
+                <Button 
+                  size="icon" 
+                  variant="ghost"
+                  className="h-6 w-6 text-muted-foreground hover:text-foreground"
+                  disabled={sending}
+                  type="button"
+                >
+                  <Paperclip className="h-4 w-4" />
+                </Button>
+                <Button 
+                  size="icon" 
+                  variant="ghost"
+                  className="h-6 w-6 text-muted-foreground hover:text-foreground"
+                  disabled={sending}
+                  type="button"
+                >
+                  <Image className="h-4 w-4" />
+                </Button>
+              </div>
             </div>
-              <Button 
-                onClick={handleSendMessage} 
-                disabled={sending || !userReady || !messageText.trim()}
-                className={`h-10 w-10 rounded-full ${sending ? 'opacity-70' : ''}`}
-              >
-                {sending ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <Send className="h-4 w-4" />
-                )}
-              </Button>
-            </div>
-            {!userReady && (
-              <p className="text-xs text-muted-foreground mt-2 text-center">
-                You need to be authenticated to send messages. Try refreshing the page or logging out and back in.
-              </p>
-            )}
+            <Button 
+              size="icon" 
+              className="h-10 w-10 rounded-full flex-shrink-0"
+              onClick={handleSendMessage}
+              disabled={sending || !messageText.trim()}
+            >
+              {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+            </Button>
           </div>
         </div>
       </div>
