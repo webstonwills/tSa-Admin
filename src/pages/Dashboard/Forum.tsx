@@ -135,10 +135,10 @@ export default function Chat() {
       // Extract all user IDs from messages (including those in replies)
       const userIds = [...new Set(messages.map(msg => msg.user_id))]; 
       
-      // Get profiles for all message authors
+      // Get profiles for all message authors - remove avatar_url from the query
       const { data: profilesData, error: profilesError } = await supabase
         .from('profiles')
-        .select('id, first_name, last_name, avatar_url')
+        .select('id, first_name, last_name')
         .in('id', userIds);
         
       if (profilesError) {
@@ -170,13 +170,13 @@ export default function Chat() {
           ...msg,
           profile: userProfile ? {
             full_name: `${userProfile.first_name || ''} ${userProfile.last_name || ''}`.trim(),
-            avatar_url: userProfile.avatar_url
+            avatar_url: null // Set to null since the column doesn't exist
           } : undefined,
           reply_to: replyToMessage ? {
             ...replyToMessage,
             profile: replyToProfile ? {
               full_name: `${replyToProfile.first_name || ''} ${replyToProfile.last_name || ''}`.trim(),
-              avatar_url: replyToProfile.avatar_url
+              avatar_url: null // Set to null since the column doesn't exist
             } : undefined
           } : undefined
         };
@@ -286,9 +286,9 @@ export default function Chat() {
     }
   };
 
-  // Get user initials for avatar
+  // Get user initials for avatar - make more robust with fallbacks
   const getInitials = (message: Message) => {
-    if (message.profile?.full_name) {
+    if (message.profile?.full_name && message.profile.full_name.trim() !== '') {
       return message.profile.full_name.split(' ')
         .map(n => n[0])
         .join('')
