@@ -374,6 +374,18 @@ export default function Chat() {
           </div>
         )}
         
+        {/* Chat header */}
+        <div className="border-b p-2 bg-background">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <h2 className="text-lg font-medium">Team Chat</h2>
+              <span className="text-xs bg-muted text-muted-foreground px-2 py-0.5 rounded-full">
+                {messages.length} messages
+              </span>
+            </div>
+          </div>
+        </div>
+        
         {/* Messages area - expanded to fill available space */}
         <ScrollArea className="flex-1 p-4" ref={scrollAreaRef}>
           {loading ? (
