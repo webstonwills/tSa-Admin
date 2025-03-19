@@ -44,8 +44,8 @@ const userColors = [
 
 // Message bubble colors for different users
 const messageBubbleColors = {
-  self: "bg-blue-500 bg-gradient-to-br from-blue-500 to-blue-600 text-white shadow-md",
-  others: "bg-gray-100 dark:bg-gray-800 text-foreground dark:text-gray-100 shadow-sm hover:shadow"
+  self: "bg-blue-500 text-white rounded-t-2xl rounded-bl-2xl rounded-br-sm",
+  others: "bg-gray-100 dark:bg-gray-800 text-foreground dark:text-gray-100 rounded-t-2xl rounded-br-2xl rounded-bl-sm"
 };
 
 export default function Chat() {
@@ -565,11 +565,11 @@ export default function Chat() {
                       </div>
                     )}
                     
-                    <div className={`group flex ${currentUserMessage ? 'justify-end' : 'justify-start'} relative w-full mb-3`}>
+                    <div className={`group flex ${currentUserMessage ? 'justify-end' : 'justify-start'} relative w-full mb-4`}>
                       {/* User avatar - only show for other users' messages */}
                       {!currentUserMessage && (
-                        <div className="flex-shrink-0 mr-2 self-end mb-1">
-                          <Avatar className="h-8 w-8 ring-2 ring-background">
+                        <div className="flex-shrink-0 mr-2 self-end">
+                          <Avatar className="h-10 w-10 border-2 border-white dark:border-gray-800">
                             <AvatarImage src={message.profile?.avatar_url || ''} />
                             <AvatarFallback className={getUserColor(message.user_id)}>
                               {getInitials(message)}
@@ -578,89 +578,41 @@ export default function Chat() {
                         </div>
                       )}
                       
-                      <div className={`flex flex-col ${currentUserMessage ? 'max-w-[75%] md:max-w-[60%]' : 'max-w-[75%] md:max-w-[60%] ml-1'}`}>
-                        {/* User name - show "You" for current user, name for others */}
-                        {isNewSender && (
-                          <span className={`text-xs mb-1 ${currentUserMessage ? 'text-right mr-1' : 'text-left ml-1'} text-muted-foreground`}>
-                            {currentUserMessage ? 'You' : (message.profile?.full_name || 'Unknown User')}
-                          </span>
-                        )}
-                        
-                        {/* Reply preview */}
-                        {message.reply_to && (
-                          <div className={`mb-1 p-2 bg-muted/50 rounded text-sm text-muted-foreground border-l-2 border-primary flex items-start gap-2 ${
-                            currentUserMessage ? 'ml-auto' : ''
-                          }`}>
-                            <Reply className="h-3 w-3 mt-0.5 flex-shrink-0" />
-                            <div className="overflow-hidden">
-                              <div className="font-medium text-xs">
-                                {message.reply_to.user_id === user?.id ? 'You' : (message.reply_to.profile?.full_name || 'Unknown User')}
-                              </div>
-                              <div className="truncate">{message.reply_to.content}</div>
-                            </div>
-                          </div>
-                        )}
+                      <div className={`flex flex-col ${currentUserMessage ? 'max-w-[70%] items-end' : 'max-w-[70%]'}`}>
+                        {/* User name */}
+                        <span className={`text-xs mb-1 ${currentUserMessage ? 'text-right' : 'text-left'} text-muted-foreground`}>
+                          {currentUserMessage ? 'You' : (message.profile?.full_name || 'Unknown User')}
+                        </span>
                         
                         {/* Message bubble */}
-                        <div 
-                          className={`relative group p-3 rounded-2xl ${
-                            currentUserMessage 
-                              ? `${messageBubbleColors.self} rounded-br-sm`
-                              : `${messageBubbleColors.others} rounded-bl-sm`
-                          }`}
-                          style={{
-                            boxShadow: currentUserMessage 
-                              ? '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)' 
-                              : '0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06)'
-                          }}
-                        >
+                        <div className={`p-3 shadow-sm ${currentUserMessage ? messageBubbleColors.self : messageBubbleColors.others}`}>
                           <div className="whitespace-pre-wrap break-words">
                             {message.content}
                           </div>
-                          
-                          {/* Message timestamp */}
-                          <div className={`text-[10px] ${
-                            currentUserMessage ? 'text-right' : 'text-left'
-                          } mt-1 opacity-70`}>
-                            {formatMessageTime(message.created_at)}
-                            {currentUserMessage && message.seen && (
-                              <span className="ml-1 inline-flex">
-                                <CheckCheck className="h-3 w-3 text-white" />
-                              </span>
-                            )}
-                          </div>
-                          
-                          {/* Reaction and reply buttons */}
-                          <div className={`absolute ${
-                            currentUserMessage ? 'left-0 -translate-x-full' : 'right-0 translate-x-full'
-                          } top-0 hidden group-hover:flex items-center gap-1 bg-background rounded-full shadow-md p-1 text-muted-foreground z-10`}>
-                            <button 
-                              className="hover:bg-muted rounded-full p-1 transition-colors"
-                              onClick={() => addReaction(message.id, '👍')}
-                            >
-                              <Smile className="h-3 w-3" />
-                            </button>
-                            <button 
-                              className="hover:bg-muted rounded-full p-1 transition-colors"
-                              onClick={() => setReplyingTo(message)}
-                            >
-                              <Reply className="h-3 w-3" />
-                            </button>
-                          </div>
                         </div>
                         
-                        {/* Reactions display */}
-                        {message.reactions && Object.keys(message.reactions).length > 0 && (
-                          <div className={`flex gap-1 mt-1 ${currentUserMessage ? 'justify-end' : 'justify-start'}`}>
-                            {Object.entries(message.reactions).map(([emoji, users]) => (
-                              <div key={`${message.id}-${emoji}`} className="bg-muted hover:bg-muted/80 transition-colors rounded-full px-2 py-0.5 text-xs flex items-center gap-1 shadow-sm cursor-pointer">
-                                <span>{emoji}</span>
-                                <span>{users.length}</span>
-                              </div>
-                            ))}
-                          </div>
-                        )}
+                        {/* Message timestamp */}
+                        <div className={`text-[10px] ${currentUserMessage ? 'text-right' : 'text-left'} mt-1 text-muted-foreground`}>
+                          {format(new Date(message.created_at), 'h:mm a')}
+                          {currentUserMessage && message.seen && (
+                            <span className="ml-1 inline-flex">
+                              <CheckCheck className="h-3 w-3 text-blue-500" />
+                            </span>
+                          )}
+                        </div>
                       </div>
+                      
+                      {/* User avatar - only show on right for current user's messages */}
+                      {currentUserMessage && (
+                        <div className="flex-shrink-0 ml-2 self-end">
+                          <Avatar className="h-10 w-10 border-2 border-white dark:border-gray-800">
+                            <AvatarImage src={message.profile?.avatar_url || ''} />
+                            <AvatarFallback className="bg-blue-600">
+                              {getInitials(message)}
+                            </AvatarFallback>
+                          </Avatar>
+                        </div>
+                      )}
                     </div>
                   </React.Fragment>
                 );
