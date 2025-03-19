@@ -4,8 +4,20 @@
   <meta charset="utf-8">
   <title>tSa-Admin</title>
   <script type="text/javascript">
-    // Redirect to the index page with the hash router URL
-    window.location.href = "/tSa-Admin/#" + window.location.pathname.replace('/tSa-Admin', '');
+    // Get the base URL from the current location
+    var basePath = window.location.pathname.split('/').slice(0, -1).join('/') || '/';
+    
+    // Single Page App redirect - works for both GitHub Pages and Vercel
+    var path = window.location.pathname;
+    var redirectUrl = basePath + '/#' + path;
+    
+    // Handle both GitHub Pages and Vercel environments
+    if (window.location.hostname.includes('vercel.app')) {
+      redirectUrl = '/#' + path;
+    }
+    
+    // Redirect to the main application
+    window.location.href = redirectUrl;
   </script>
 </head>
 <body>
