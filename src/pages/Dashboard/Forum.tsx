@@ -44,8 +44,8 @@ const userColors = [
 
 // Message bubble colors for different users
 const messageBubbleColors = {
-  self: "bg-primary text-primary-foreground",
-  others: "bg-muted"
+  self: "bg-gradient-to-br from-primary to-primary/90 text-primary-foreground shadow-md",
+  others: "bg-muted shadow-sm hover:shadow"
 };
 
 export default function Chat() {
@@ -77,6 +77,22 @@ export default function Chat() {
       userColorMap.current.set(userId, userColors[colorIndex]);
     }
     return userColorMap.current.get(userId) || "bg-primary";
+  };
+  
+  // Get a consistent background color for message bubbles based on user ID
+  const getUserBubbleColor = (userId: string) => {
+    // For current user, we always use the primary color defined in messageBubbleColors
+    if (user?.id === userId) return '';
+    
+    if (!userColorMap.current.has(`bubble-${userId}`)) {
+      const hashCode = userId.split('').reduce((acc, char) => {
+        return char.charCodeAt(0) + ((acc << 5) - acc);
+      }, 0);
+      const h = Math.abs(hashCode) % 360;
+      // Using a very light pastel color with consistent saturation and lightness
+      userColorMap.current.set(`bubble-${userId}`, `bg-gradient-to-r from-[hsl(${h},30%,95%)] to-[hsl(${h},30%,92%)]`);
+    }
+    return userColorMap.current.get(`bubble-${userId}`) || "";
   };
   
   // Check if user is ready and properly authenticated
@@ -553,7 +569,7 @@ export default function Chat() {
                       {/* User avatar - only show on left for other users' messages */}
                       {!currentUserMessage && isNewSender && (
                         <div className="flex-shrink-0 mr-2">
-                          <Avatar className="h-8 w-8">
+                          <Avatar className="h-8 w-8 ring-2 ring-background">
                             <AvatarImage src={message.profile?.avatar_url || ''} />
                             <AvatarFallback className={getUserColor(message.user_id)}>
                               {getInitials(message)}
@@ -562,7 +578,7 @@ export default function Chat() {
                         </div>
                       )}
                       
-                      <div className={`flex flex-col max-w-[80%] ${currentUserMessage ? '' : 'ml-10'}`}>
+                      <div className={`flex flex-col max-w-[75%] md:max-w-[60%] ${currentUserMessage ? '' : 'ml-10'}`}>
                         {/* User name - only show for new sender */}
                         {isNewSender && (
                           <span className={`text-xs mb-1 ${currentUserMessage ? 'text-right' : 'text-left'} text-muted-foreground`}>
@@ -586,12 +602,21 @@ export default function Chat() {
                         )}
                         
                         {/* Message bubble */}
-                        <div className={`relative group p-3 rounded-lg shadow-sm ${
-                          currentUserMessage 
-                            ? `${messageBubbleColors.self} rounded-br-none`
-                            : `${messageBubbleColors.others} rounded-bl-none`
-                        }`}>
-                          {message.content}
+                        <div 
+                          className={`relative group p-3 rounded-lg ${
+                            currentUserMessage 
+                              ? `${messageBubbleColors.self} rounded-br-none`
+                              : `${messageBubbleColors.others} ${getUserBubbleColor(message.user_id)} rounded-bl-none`
+                          }`}
+                          style={{
+                            boxShadow: currentUserMessage 
+                              ? '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)' 
+                              : '0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06)'
+                          }}
+                        >
+                          <div className="whitespace-pre-wrap break-words">
+                            {message.content}
+                          </div>
                           
                           {/* Message timestamp */}
                           <div className={`text-[10px] ${
@@ -608,15 +633,15 @@ export default function Chat() {
                           {/* Reaction and reply buttons */}
                           <div className={`absolute ${
                             currentUserMessage ? 'left-0 -translate-x-full' : 'right-0 translate-x-full'
-                          } top-0 hidden group-hover:flex items-center gap-1 bg-background rounded-full shadow p-1 text-muted-foreground`}>
+                          } top-0 hidden group-hover:flex items-center gap-1 bg-background rounded-full shadow-md p-1 text-muted-foreground z-10`}>
                             <button 
-                              className="hover:bg-muted rounded-full p-1"
+                              className="hover:bg-muted rounded-full p-1 transition-colors"
                               onClick={() => addReaction(message.id, '👍')}
                             >
                               <Smile className="h-3 w-3" />
                             </button>
                             <button 
-                              className="hover:bg-muted rounded-full p-1"
+                              className="hover:bg-muted rounded-full p-1 transition-colors"
                               onClick={() => setReplyingTo(message)}
                             >
                               <Reply className="h-3 w-3" />
@@ -628,7 +653,7 @@ export default function Chat() {
                         {message.reactions && Object.keys(message.reactions).length > 0 && (
                           <div className={`flex gap-1 mt-1 ${currentUserMessage ? 'justify-end' : 'justify-start'}`}>
                             {Object.entries(message.reactions).map(([emoji, users]) => (
-                              <div key={`${message.id}-${emoji}`} className="bg-muted rounded-full px-2 py-0.5 text-xs flex items-center gap-1">
+                              <div key={`${message.id}-${emoji}`} className="bg-muted hover:bg-muted/80 transition-colors rounded-full px-2 py-0.5 text-xs flex items-center gap-1 shadow-sm cursor-pointer">
                                 <span>{emoji}</span>
                                 <span>{users.length}</span>
                               </div>
@@ -661,7 +686,7 @@ export default function Chat() {
         </ScrollArea>
         
         {/* Fixed input area at the bottom */}
-        <div className="border-t bg-background p-3 sticky bottom-0 left-0 right-0 z-10 shadow-[0_-2px_5px_rgba(0,0,0,0.05)]">
+        <div className="border-t bg-background p-3 sticky bottom-0 left-0 right-0 z-10 shadow-[0_-2px_5px_rgba(0,0,0,0.1)]">
           {/* Reply preview */}
           {replyingTo && (
             <div className="mb-2 p-2 bg-muted/30 rounded text-sm text-muted-foreground border-l-2 border-primary flex items-center justify-between">
