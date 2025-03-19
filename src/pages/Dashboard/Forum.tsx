@@ -85,44 +85,76 @@ export default function Chat() {
     try {
       setLoading(true);
       
+      // First get the basic message data without joins
       const { data, error } = await supabase
         .from('chat_messages')
-        .select(`
-          *,
-          profiles!chat_messages_user_id_fkey(id, first_name, last_name, email, avatar_url),
-          reply_to:chat_messages(
-            id,
-            content,
-            user_id,
-            profiles!chat_messages_user_id_fkey(id, first_name, last_name, email, avatar_url)
-          )
-        `)
+        .select('*')
         .order('created_at', { ascending: true });
 
       if (error) {
         throw error;
       }
       
-      console.log("Messages data:", data);
+      // We'll fetch profiles separately since we're having join issues
+      const messages = data || [];
       
-      // Process the data to match our Message interface
-      const processedMessages = (data || []).map((msg: any) => {
+      if (messages.length === 0) {
+        setMessages([]);
+        setLoading(false);
+        return;
+      }
+      
+      // Extract all user IDs from messages (including those in replies)
+      const userIds = [...new Set(messages.map(msg => msg.user_id))]; 
+      
+      // Get profiles for all message authors
+      const { data: profilesData, error: profilesError } = await supabase
+        .from('profiles')
+        .select('id, first_name, last_name, avatar_url')
+        .in('id', userIds);
+        
+      if (profilesError) {
+        console.error("Error fetching profiles:", profilesError);
+        // Continue anyway, we'll just have messages without profile info
+      }
+      
+      // Create a map of profiles by user ID for quick lookup
+      const profilesMap = {};
+      if (profilesData) {
+        for (const profile of profilesData) {
+          profilesMap[profile.id] = profile;
+        }
+      }
+      
+      // Process the messages with profile data
+      const processedMessages = messages.map(msg => {
+        const userProfile = profilesMap[msg.user_id];
+        
+        // Find the reply message if there's a reply_to_id
+        const replyToMessage = msg.reply_to_id 
+          ? messages.find(m => m.id === msg.reply_to_id)
+          : null;
+          
+        // Get the profile for the reply message author
+        const replyToProfile = replyToMessage && profilesMap[replyToMessage.user_id];
+        
         return {
           ...msg,
-          profile: msg.profiles ? {
-            full_name: msg.profiles.first_name + ' ' + (msg.profiles.last_name || ''),
-            avatar_url: msg.profiles.avatar_url
+          profile: userProfile ? {
+            full_name: `${userProfile.first_name || ''} ${userProfile.last_name || ''}`.trim(),
+            avatar_url: userProfile.avatar_url
           } : undefined,
-          reply_to: msg.reply_to && msg.reply_to.length > 0 ? {
-            ...msg.reply_to[0],
-            profile: msg.reply_to[0]?.profiles ? {
-              full_name: msg.reply_to[0].profiles.first_name + ' ' + (msg.reply_to[0].profiles.last_name || ''),
-              avatar_url: msg.reply_to[0].profiles.avatar_url
+          reply_to: replyToMessage ? {
+            ...replyToMessage,
+            profile: replyToProfile ? {
+              full_name: `${replyToProfile.first_name || ''} ${replyToProfile.last_name || ''}`.trim(),
+              avatar_url: replyToProfile.avatar_url
             } : undefined
           } : undefined
         };
       });
       
+      console.log("Processed messages:", processedMessages);
       setMessages(processedMessages);
       
       // Scroll to bottom after messages load
