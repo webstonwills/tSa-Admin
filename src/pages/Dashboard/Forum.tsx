@@ -44,8 +44,8 @@ const userColors = [
 
 // Message bubble colors for different users
 const messageBubbleColors = {
-  self: "bg-gradient-to-br from-primary to-primary/90 text-primary-foreground shadow-md",
-  others: "bg-muted shadow-sm hover:shadow"
+  self: "bg-blue-500 bg-gradient-to-br from-blue-500 to-blue-600 text-white shadow-md",
+  others: "bg-gray-100 dark:bg-gray-800 text-foreground dark:text-gray-100 shadow-sm hover:shadow"
 };
 
 export default function Chat() {
@@ -565,10 +565,10 @@ export default function Chat() {
                       </div>
                     )}
                     
-                    <div className={`group flex ${currentUserMessage ? 'justify-end' : 'justify-start'} relative`}>
+                    <div className={`group flex ${currentUserMessage ? 'justify-end' : 'justify-start'} relative w-full mb-2`}>
                       {/* User avatar - only show on left for other users' messages */}
-                      {!currentUserMessage && isNewSender && (
-                        <div className="flex-shrink-0 mr-2">
+                      {!currentUserMessage && (
+                        <div className="flex-shrink-0 mr-2 self-end mb-1">
                           <Avatar className="h-8 w-8 ring-2 ring-background">
                             <AvatarImage src={message.profile?.avatar_url || ''} />
                             <AvatarFallback className={getUserColor(message.user_id)}>
@@ -578,7 +578,7 @@ export default function Chat() {
                         </div>
                       )}
                       
-                      <div className={`flex flex-col max-w-[75%] md:max-w-[60%] ${currentUserMessage ? '' : 'ml-10'}`}>
+                      <div className={`flex flex-col max-w-[75%] md:max-w-[60%] ${currentUserMessage ? '' : ''}`}>
                         {/* User name - only show for new sender */}
                         {isNewSender && (
                           <span className={`text-xs mb-1 ${currentUserMessage ? 'text-right' : 'text-left'} text-muted-foreground`}>
@@ -603,10 +603,10 @@ export default function Chat() {
                         
                         {/* Message bubble */}
                         <div 
-                          className={`relative group p-3 rounded-lg ${
+                          className={`relative group p-3 rounded-2xl ${
                             currentUserMessage 
-                              ? `${messageBubbleColors.self} rounded-br-none`
-                              : `${messageBubbleColors.others} ${getUserBubbleColor(message.user_id)} rounded-bl-none`
+                              ? `${messageBubbleColors.self} rounded-br-sm`
+                              : `${messageBubbleColors.others} rounded-bl-sm`
                           }`}
                           style={{
                             boxShadow: currentUserMessage 
@@ -625,7 +625,7 @@ export default function Chat() {
                             {formatMessageTime(message.created_at)}
                             {currentUserMessage && message.seen && (
                               <span className="ml-1 inline-flex">
-                                <CheckCheck className="h-3 w-3 text-blue-500" />
+                                <CheckCheck className="h-3 w-3 text-white" />
                               </span>
                             )}
                           </div>
@@ -661,6 +661,18 @@ export default function Chat() {
                           </div>
                         )}
                       </div>
+                      
+                      {/* User avatar - only show on right for current user's messages */}
+                      {currentUserMessage && (
+                        <div className="flex-shrink-0 ml-2 self-end mb-1">
+                          <Avatar className="h-8 w-8 ring-2 ring-background">
+                            <AvatarImage src={message.profile?.avatar_url || ''} />
+                            <AvatarFallback className="bg-blue-600">
+                              {getInitials(message)}
+                            </AvatarFallback>
+                          </Avatar>
+                        </div>
+                      )}
                     </div>
                   </React.Fragment>
                 );
