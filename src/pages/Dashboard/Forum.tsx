@@ -72,6 +72,19 @@ export default function Chat() {
     } else {
       console.log("User not ready:", user);
       setUserReady(false);
+      
+      // Try to get the session directly from Supabase
+      const checkSession = async () => {
+        const { data: { session }, error } = await supabase.auth.getSession();
+        console.log("Direct session check:", session, "Error:", error);
+        
+        if (session?.user?.id) {
+          console.log("Found user via direct session check:", session.user);
+          setUserReady(true);
+        }
+      };
+      
+      checkSession();
     }
   }, [user]);
   
@@ -301,14 +314,63 @@ export default function Chat() {
     setReplyingTo(null);
   };
 
+  // Force refresh authentication
+  const refreshAuth = async () => {
+    try {
+      setLoading(true);
+      const { data, error } = await supabase.auth.refreshSession();
+      
+      if (error) {
+        throw error;
+      }
+      
+      if (data.session?.user?.id) {
+        console.log("Auth refreshed, new user data:", data.session.user);
+        toast({
+          title: 'Authentication Refreshed',
+          description: 'You should now be able to send messages.',
+        });
+        setUserReady(true);
+        await fetchMessages();
+      } else {
+        throw new Error("Unable to refresh authentication");
+      }
+    } catch (error: any) {
+      console.error("Auth refresh failed:", error);
+      toast({
+        title: 'Authentication Failed',
+        description: 'Please try logging out and back in.',
+        variant: 'destructive',
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="h-full flex flex-col">
       {/* The main chat content - exclude the header that's already in the dashboard layout */}
       <div className="flex-1 flex flex-col h-[calc(100vh-170px)] overflow-hidden">
         {/* Auth Status Banner - show if user is not ready */}
         {!userReady && (
-          <div className="bg-amber-100 dark:bg-amber-900/30 text-amber-800 dark:text-amber-200 text-sm p-2 text-center">
-            Checking authentication status... You may need to refresh if messages can't be sent.
+          <div className="bg-amber-100 dark:bg-amber-900/30 text-amber-800 dark:text-amber-200 p-3 text-center flex flex-col gap-2">
+            <p>Authentication issue detected. Your session may have expired.</p>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              className="mx-auto bg-amber-200 dark:bg-amber-800 hover:bg-amber-300"
+              onClick={refreshAuth}
+              disabled={loading}
+            >
+              {loading ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Refreshing...
+                </>
+              ) : (
+                <>Refresh Authentication</>
+              )}
+            </Button>
           </div>
         )}
         
@@ -466,6 +528,11 @@ export default function Chat() {
                 )}
               </Button>
             </div>
+            {!userReady && (
+              <p className="text-xs text-muted-foreground mt-2 text-center">
+                You need to be authenticated to send messages. Try refreshing the page or logging out and back in.
+              </p>
+            )}
           </div>
         </div>
       </div>
