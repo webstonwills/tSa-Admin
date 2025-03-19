@@ -2,10 +2,41 @@
 import { createClient } from '@supabase/supabase-js';
 import type { Database } from './types';
 
-const SUPABASE_URL = "https://ajfekrrllgmbuccddotm.supabase.co";
-const SUPABASE_PUBLISHABLE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFqZmVrcnJsbGdtYnVjY2Rkb3RtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDE2NDQ2NTIsImV4cCI6MjA1NzIyMDY1Mn0.5SHCGdWRrf2hnEWtmt-9fAHM3aKAVP8PBh8mFPkweVs";
+// Use environment variables when available, fallback to hardcoded values for development
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || "https://ajfekrrllgmbuccddotm.supabase.co";
+const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFqZmVrcnJsbGdtYnVjY2Rkb3RtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDE2NDQ2NTIsImV4cCI6MjA1NzIyMDY1Mn0.5SHCGdWRrf2hnEWtmt-9fAHM3aKAVP8PBh8mFPkweVs";
 
 // Import the supabase client like this:
 // import { supabase } from "@/integrations/supabase/client";
 
-export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
+// Create the Supabase client with optimized settings
+export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_ANON_KEY, {
+  auth: {
+    autoRefreshToken: true,
+    persistSession: true,
+    detectSessionInUrl: true,
+    storage: localStorage // Use localStorage for session persistence
+  },
+  realtime: {
+    params: {
+      eventsPerSecond: 10 // Limit realtime events
+    }
+  },
+  global: {
+    headers: {
+      'x-application-name': 'tsa-admin'
+    },
+    // Increased fetch timeout
+    fetch: (url, options) => {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 second timeout
+
+      return fetch(url, {
+        ...options,
+        signal: controller.signal
+      }).finally(() => {
+        clearTimeout(timeoutId);
+      });
+    }
+  }
+});

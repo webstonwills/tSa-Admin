@@ -80,7 +80,7 @@ const CEODashboard = () => {
             <Activity className="h-5 w-5 text-blue-600" />
             Company Overview
           </h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
             <OverviewCard
               title="Total Revenue"
               value="$1.24M"
@@ -97,38 +97,38 @@ const CEODashboard = () => {
               icon={<CheckCircle className="h-5 w-5" />}
               className="bg-gradient-to-br from-amber-50 to-amber-100 border-amber-200"
             />
-            <OverviewCard
-              title="Departments"
-              value="7"
+          <OverviewCard
+            title="Departments"
+            value="7"
               change="Active"
-              isPositive={true}
-              icon={<Building2 className="h-5 w-5" />}
-              className="bg-gradient-to-br from-blue-50 to-blue-100 border-blue-200"
-            />
-            <OverviewCard
-              title="Total Employees"
-              value="248"
-              change="+12"
-              isPositive={true}
-              icon={<Users className="h-5 w-5" />}
-              className="bg-gradient-to-br from-purple-50 to-purple-100 border-purple-200"
-            />
-          </div>
+            isPositive={true}
+            icon={<Building2 className="h-5 w-5" />}
+            className="bg-gradient-to-br from-blue-50 to-blue-100 border-blue-200"
+          />
+          <OverviewCard
+            title="Total Employees"
+            value="248"
+            change="+12"
+            isPositive={true}
+            icon={<Users className="h-5 w-5" />}
+            className="bg-gradient-to-br from-purple-50 to-purple-100 border-purple-200"
+          />
+        </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
-            <ChartCard
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
+          <ChartCard
               title="Financial Performance"
               subtitle="Revenue vs Expenses (Current Year)"
-              type="area"
-              data={revenueData}
-            />
-            <ChartCard
-              title="Department Performance"
+            type="area"
+            data={revenueData}
+          />
+          <ChartCard
+            title="Department Performance"
               subtitle="Productivity rate by department (%)"
-              type="bar"
-              data={departmentPerformance}
-            />
-          </div>
+            type="bar"
+            data={departmentPerformance}
+          />
+        </div>
         </section>
 
         {/* SECTION 2: User & Department Management */}
@@ -138,21 +138,21 @@ const CEODashboard = () => {
             User & Department Management
           </h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <Card className="p-6 shadow-md">
-              <h3 className="text-lg font-semibold mb-4 flex items-center">
+          <Card className="p-6 shadow-md">
+            <h3 className="text-lg font-semibold mb-4 flex items-center">
                 <Users className="h-5 w-5 text-blue-600 mr-2" />
                 User Management
-              </h3>
-              <div className="space-y-4">
-                <div className="flex justify-between items-center pb-2 border-b border-gray-100">
+            </h3>
+            <div className="space-y-4">
+              <div className="flex justify-between items-center pb-2 border-b border-gray-100">
                   <p className="font-medium">New Registration Requests</p>
                   <span className="px-2 py-1 bg-amber-100 text-amber-800 text-xs rounded-full">3 Pending</span>
                 </div>
                 <div className="flex justify-between items-center pb-2 border-b border-gray-100">
                   <p className="font-medium">Active Users</p>
                   <span className="font-medium text-green-600">234</span>
-                </div>
-                <div className="flex justify-between items-center pb-2 border-b border-gray-100">
+              </div>
+              <div className="flex justify-between items-center pb-2 border-b border-gray-100">
                   <p className="font-medium">Inactive Users</p>
                   <span className="font-medium text-gray-600">14</span>
                 </div>
@@ -290,14 +290,14 @@ const CEODashboard = () => {
                 <button className="mt-2 w-full px-4 py-2 bg-blue-50 text-blue-600 rounded-md hover:bg-blue-100 transition-colors text-sm">
                   View Full Audit Log
                 </button>
-              </div>
-            </Card>
+            </div>
+          </Card>
 
-            <Card className="p-6 shadow-md">
-              <h3 className="text-lg font-semibold mb-4 flex items-center">
+          <Card className="p-6 shadow-md">
+            <h3 className="text-lg font-semibold mb-4 flex items-center">
                 <AlertCircle className="h-5 w-5 text-blue-600 mr-2" />
                 Security Alerts
-              </h3>
+            </h3>
               <div className="space-y-3">
                 <div className="flex items-start gap-3 pb-2 border-b border-gray-100">
                   <div className="p-2 rounded-full bg-amber-100">
@@ -318,7 +318,7 @@ const CEODashboard = () => {
                     <p className="text-xs text-gray-500">Finance department user account</p>
                     <p className="text-xs text-red-600 mt-1">High Risk • 1 day ago</p>
                   </div>
-                </div>
+              </div>
                 <div className="grid grid-cols-2 gap-3 mt-4">
                   <button className="px-4 py-2 bg-blue-50 text-blue-600 rounded-md hover:bg-blue-100 transition-colors text-sm">
                     Security Report
@@ -379,16 +379,16 @@ const CEODashboard = () => {
                   <button className="px-4 py-2 bg-gray-50 text-gray-600 rounded-md hover:bg-gray-100 transition-colors text-sm">
                     Mark All Read
                   </button>
-                </div>
               </div>
-            </Card>
+            </div>
+          </Card>
 
-            <Card className="p-6 shadow-md">
-              <h3 className="text-lg font-semibold mb-4 flex items-center">
+          <Card className="p-6 shadow-md">
+            <h3 className="text-lg font-semibold mb-4 flex items-center">
                 <Mail className="h-5 w-5 text-blue-600 mr-2" />
                 Communication Center
-              </h3>
-              <div className="space-y-4">
+            </h3>
+            <div className="space-y-4">
                 <div className="flex justify-between items-center pb-2 border-b border-gray-100">
                   <p className="font-medium">Unread Messages</p>
                   <span className="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded-full">5 New</span>
@@ -494,9 +494,9 @@ const CEODashboard = () => {
                   <Lock className="h-4 w-4 mr-2" />
                   Security Settings
                 </button>
-              </div>
-            </Card>
-          </div>
+            </div>
+          </Card>
+        </div>
         </section>
       </div>
     </DashboardLayout>

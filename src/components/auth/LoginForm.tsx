@@ -178,112 +178,140 @@ const LoginForm: React.FC = () => {
     const handleSuccessfulLogin = async () => {
       try {
         console.log("LOGIN DEBUG: User authenticated, user ID:", user.id, "email:", user.email);
-        console.log("PERF DEBUG: Login success at", new Date().toISOString());
         
         // Clear login state immediately to prevent repeated processing
         setLoginSuccess(false);
         
-        // Add a timeout to the entire login process
-        const loginTimeout = setTimeout(() => {
-          console.log('LOGIN DEBUG: Login sequence taking too long, forcing navigation to pending approval');
-          setIsLoading(false);
-          // Force navigate to pending approval as a fallback
-          navigate('/auth/pending-approval', { replace: true });
-          notify.info('Login process is taking longer than expected', { 
-            description: 'We have directed you to the pending approval page as a precaution.'
-          });
-        }, 5000);
+        // Get user role directly from auth
+        const { data: authUser } = await supabase.auth.getUser();
+        const userMetadata = authUser?.user?.user_metadata || {};
+        
+        console.log("LOGIN DEBUG: Auth metadata:", userMetadata);
+        
+        const metadataRole = userMetadata.role || '';
+        const metadataApprovalStatus = userMetadata.approval_status || APPROVAL_STATUS.PENDING;
+        const isCEO = (userMetadata.role === 'ceo') || 
+                      (userMetadata.department_code === 'CEO');
+        
+        console.log("LOGIN DEBUG: User details from metadata - Role:", metadataRole, "Approval:", metadataApprovalStatus, "Is CEO:", isCEO);
+        
+        // For CEO users, always go to the CEO dashboard immediately
+        if (isCEO) {
+          console.log("LOGIN DEBUG: CEO role confirmed - navigating to CEO dashboard");
+          navigate(APP_CONFIG.DASHBOARDS.CEO, { replace: true });
+          notify.success('Welcome back, CEO!');
+          return;
+        }
+        
+        // For non-CEO users, we need to check the actual approval status in the database
+        // because the metadata might be out of sync with the database
+        console.log("LOGIN DEBUG: Fetching actual approval status from database");
         
         try {
-          // Since we have profile fetch issues, use a direct check for user role
-          console.log("LOGIN DEBUG: Checking directly for user role from auth metadata");
+          // Get the true approval status from the profiles table
+          const { data: profileData, error: profileError } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('id', user.id)
+            .single();
+            
+          if (profileError) {
+            throw profileError;
+          }
           
-          // Get user role directly from auth
-          const { data: authUser } = await supabase.auth.getUser();
-          const userMetadata = authUser?.user?.user_metadata || {};
+          console.log("LOGIN DEBUG: Database profile data:", profileData);
           
-          console.log("LOGIN DEBUG: Auth metadata:", userMetadata);
+          // Use the database approval status, which is more authoritative than metadata
+          const dbApprovalStatus = profileData.approval_status;
+          const dbRole = profileData.role;
+          const dbDepartmentId = profileData.department_id;
           
-          const role = userMetadata.role || '';
-          const approvalStatus = userMetadata.approval_status || APPROVAL_STATUS.PENDING;
-          const isCEO = (userMetadata.role === 'ceo') || 
-                        (userMetadata.department_code === 'CEO');
+          console.log("LOGIN DEBUG: Database status - Approval:", dbApprovalStatus, "Role:", dbRole, "Department:", dbDepartmentId);
           
-          console.log("LOGIN DEBUG: User details from metadata - Role:", role, "Approval:", approvalStatus, "Is CEO:", isCEO);
-          
-          // For new users or pending approval users, send to pending page
-          // ONLY exception is the CEO who can bypass approval
-          if (approvalStatus === APPROVAL_STATUS.PENDING && !isCEO) {
+          // Check approval status from the database
+          if (dbApprovalStatus === 'approved') {
+            console.log("LOGIN DEBUG: User is APPROVED in database");
+            
+            // User is approved - redirect based on role
+            if (dbRole === 'secretary') {
+              console.log("LOGIN DEBUG: Secretary role detected - navigating to secretary dashboard");
+              navigate(APP_CONFIG.DASHBOARDS.SECRETARY, { replace: true });
+              return;
+            } else if (dbRole === 'finance') {
+              console.log("LOGIN DEBUG: Finance role detected - navigating to finance dashboard");
+              navigate(APP_CONFIG.DASHBOARDS.FINANCE, { replace: true });
+              return;
+            } else if (dbRole === 'business_management') {
+              console.log("LOGIN DEBUG: Business management role detected - navigating to BM dashboard");
+              navigate(APP_CONFIG.DASHBOARDS.BUSINESS_MANAGEMENT, { replace: true });
+              return;
+            } else if (dbRole === 'auditor') {
+              console.log("LOGIN DEBUG: Auditor role detected - navigating to auditor dashboard");
+              navigate(APP_CONFIG.DASHBOARDS.AUDITOR, { replace: true });
+              return;
+            } else if (dbRole === 'welfare') {
+              console.log("LOGIN DEBUG: Welfare role detected - navigating to welfare dashboard");
+              navigate(APP_CONFIG.DASHBOARDS.WELFARE, { replace: true });
+              return;
+            } else if (dbRole === 'board_member') {
+              console.log("LOGIN DEBUG: Board member role detected - navigating to board member dashboard");
+              navigate(APP_CONFIG.DASHBOARDS.BOARD_MEMBER, { replace: true });
+              return;
+            } else if (dbDepartmentId) {
+              console.log(`LOGIN DEBUG: User has department ID ${dbDepartmentId} - directing to department dashboard`);
+              navigate(`/dashboard/department/${dbDepartmentId}`, { replace: true });
+              return;
+            } else {
+              // If no specific role but still approved, go to default dashboard
+              console.log("LOGIN DEBUG: Approved user with no specific role - using default dashboard");
+              navigate(APP_CONFIG.DASHBOARDS.DEFAULT, { replace: true });
+              return;
+            }
+          } else if (dbApprovalStatus === 'rejected') {
+            console.log('LOGIN DEBUG: User account was rejected - redirecting to rejected page');
+            navigate('/auth/rejected-approval', { replace: true });
+            return;
+          } else {
+            // User is pending approval
             console.log('LOGIN DEBUG: User account requires approval - redirecting to pending page');
-            clearTimeout(loginTimeout);
+            navigate('/auth/pending-approval', { replace: true });
+            notify.info('Your account is pending approval by an administrator');
+            return;
+          }
+        } catch (profileError) {
+          console.error("LOGIN DEBUG: Error fetching profile from database:", profileError);
+          
+          // Fallback to metadata if database check fails
+          if (metadataApprovalStatus === APPROVAL_STATUS.PENDING) {
+            console.log('LOGIN DEBUG: Fallback to metadata: User account requires approval');
             navigate('/auth/pending-approval', { replace: true });
             notify.info('Your account is pending approval by an administrator');
             return;
           }
           
-          if (approvalStatus === APPROVAL_STATUS.REJECTED) {
-            console.log('LOGIN DEBUG: User account was rejected - redirecting to rejected page');
-            clearTimeout(loginTimeout);
+          if (metadataApprovalStatus === APPROVAL_STATUS.REJECTED) {
+            console.log('LOGIN DEBUG: Fallback to metadata: User account was rejected');
             navigate('/auth/rejected-approval', { replace: true });
             return;
           }
-          
-          // User is approved - determine dashboard based on role
-          console.log("LOGIN DEBUG: User approved, determining dashboard");
-          
-          // For CEO users, always go to the CEO dashboard
-          if (isCEO) {
-            console.log("LOGIN DEBUG: CEO role confirmed - navigating to CEO dashboard");
-            clearTimeout(loginTimeout);
-            navigate(APP_CONFIG.DASHBOARDS.CEO, { replace: true });
-            notify.success('Welcome back, CEO!');
-            return;
-          }
-          
-          // Try to refresh profile but don't wait indefinitely
-          try {
-            console.log("LOGIN DEBUG: Attempting to refresh profile");
-            
-            // Skip to navigation if profile refresh takes too long
-            const refreshTimeout = setTimeout(() => {
-              console.log("LOGIN DEBUG: Profile refresh timeout, proceeding with navigation");
-              clearTimeout(loginTimeout);
-              handleNavigation();
-            }, 3000);
-            
-            await refreshProfile();
-            
-            clearTimeout(refreshTimeout);
-            console.log("LOGIN DEBUG: Profile refreshed successfully");
-          } catch (refreshError) {
-            console.error("LOGIN DEBUG: Error refreshing profile:", refreshError);
-          }
-          
-          // For all other approved users, use handleNavigation to go to appropriate dashboard
-          console.log("LOGIN DEBUG: Calling handleNavigation for approved user");
-          clearTimeout(loginTimeout);
-          handleNavigation();
-        } catch (error) {
-          console.error("LOGIN DEBUG: Error in login sequence:", error);
-          clearTimeout(loginTimeout);
-          notify.error('Login problem detected', {
-            description: 'Redirecting you to the pending approval page'
-          });
-          navigate('/auth/pending-approval', { replace: true });
         }
+        
+        // Final fallback to handleNavigation for any cases not specifically handled above
+        console.log("LOGIN DEBUG: Calling handleNavigation as fallback");
+        handleNavigation();
       } catch (error) {
-        console.error("LOGIN DEBUG: Critical error during post-login process:", error);
-        notify.error('There was a problem loading your profile. Please try again.');
+        console.error("LOGIN DEBUG: Error in login sequence:", error);
+        notify.error('Login problem detected', {
+          description: 'Redirecting you to the pending approval page'
+        });
         navigate('/auth/pending-approval', { replace: true });
-      } finally {
-        setIsLoading(false);
       }
     };
 
     handleSuccessfulLogin();
-  }, [loginSuccess, user, refreshProfile, navigate, forceCorrectProfile, userProfile, handleNavigation]);
+  }, [loginSuccess, user, navigate, handleNavigation]);
 
-  // Simplified handleSubmit to mark login as successful and let useEffect handle the rest
+  // Enhanced version of handleSubmit that handles login more efficiently
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -296,6 +324,10 @@ const LoginForm: React.FC = () => {
     
     try {
       console.log('LOGIN DEBUG: Attempting sign in with email:', email);
+      
+      // Clear previous errors
+      localStorage.removeItem('tsa_login_error');
+      
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
@@ -303,26 +335,150 @@ const LoginForm: React.FC = () => {
 
       if (error) {
         console.error('LOGIN DEBUG: Login error:', error);
+        localStorage.setItem('tsa_login_error', error.message);
         notify.authError(error.message || 'Invalid login credentials');
         setIsLoading(false);
         return;
       }
+
+      // Get metadata from the auth response
+      const userMetadata = data.user?.user_metadata || {};
+      const role = userMetadata.role || '';
+      const approvalStatus = userMetadata.approval_status || APPROVAL_STATUS.PENDING;
+      const departmentCode = userMetadata.department_code;
+      const isCEO = (role === 'ceo') || (departmentCode === 'CEO');
       
-      console.log('LOGIN DEBUG: Auth successful, redirecting to pending approval page');
+      console.log('LOGIN DEBUG: User metadata:', userMetadata);
+      console.log('LOGIN DEBUG: Role:', role, 'Department:', departmentCode, 'isCEO:', isCEO);
+      
+      // Cache auth data for faster loading
+      localStorage.setItem('tsa_user_role', isCEO ? 'ceo' : role);
+      localStorage.setItem('tsa_user_status', approvalStatus);
+      
+      // Authentication successful
+      console.log('LOGIN DEBUG: Auth successful, redirecting based on role:', role);
       notify.authSuccess('Signed in successfully');
       
-      // Immediately redirect to pending approval - profile loading will happen in background
-      setIsLoading(false);
+      // Set flag to indicate login is in progress
+      localStorage.setItem('tsa_login_in_progress', 'true');
       
-      // Force redirect with window.location to ensure it works across environments
-      window.location.href = '/auth/pending-approval';
-      
-      // The line below might not execute due to the redirect above
-      setLoginSuccess(true);
-      
+      // For CEO users, directly navigate to dashboard without waiting for profile
+      if (isCEO) {
+        console.log('LOGIN DEBUG: CEO user detected, redirecting directly to CEO dashboard');
+        setIsLoading(false);
+        
+        try {
+          // Fix for hash router - ensure we use the correct route format
+          const baseUrl = window.location.origin;
+          // Find the router pattern - either hash or regular routes
+          const isHashRouter = window.location.href.includes('/#/');
+          
+          // Construct the URL with the appropriate pattern
+          let dashboardUrl;
+          if (isHashRouter) {
+            // For hash router pattern
+            dashboardUrl = `${baseUrl}/#/dashboard/ceo`;
+          } else {
+            // For browser router pattern, or fallback if we can't detect
+            dashboardUrl = `${baseUrl}/#/dashboard/ceo`;
+          }
+          
+          console.log('LOGIN DEBUG: Redirecting CEO to URL:', dashboardUrl);
+          
+          // Force a clean navigation state by first removing any login flags
+          localStorage.removeItem('tsa_login_in_progress');
+          
+          // In case there's any async issues, set a flag indicating CEO login
+          localStorage.setItem('tsa_ceo_redirect', 'true');
+          
+          // Use immediate navigation to avoid React rendering cycles
+          window.location.href = dashboardUrl;
+        } catch (error) {
+          console.error('LOGIN DEBUG: Error during CEO redirect:', error);
+          // Fallback to navigate API if direct redirect fails
+          navigate(APP_CONFIG.DASHBOARDS.CEO, { replace: true });
+        }
+        return;
+      }
+
+      // For non-CEO users, we need to check if they have a department and role in the database
+      // before setting the login success
+      try {
+        // Get user profile from database to check approval status directly
+        const { data: profileData, error: profileError } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', data.user.id)
+          .single();
+        
+        if (profileError) {
+          console.error('LOGIN DEBUG: Error fetching profile:', profileError);
+          setLoginSuccess(true); // Fall back to useEffect navigation
+          setIsLoading(false);
+          return;
+        }
+        
+        console.log('LOGIN DEBUG: Profile data from DB:', profileData);
+        
+        const dbRole = profileData.role;
+        const dbApprovalStatus = profileData.approval_status;
+        const dbDepartmentId = profileData.department_id;
+        
+        console.log('LOGIN DEBUG: DB role:', dbRole, 'DB approval:', dbApprovalStatus);
+        
+        // Handle redirection based on actual database values
+        if (dbApprovalStatus === 'approved' && dbRole) {
+          console.log('LOGIN DEBUG: User is approved with role:', dbRole);
+          
+          // Direct navigation based on role
+          const roleLower = dbRole.toLowerCase();
+          
+          if (roleLower === 'secretary') {
+            console.log('LOGIN DEBUG: Secretary role detected, redirecting');
+            setIsLoading(false);
+            navigate(APP_CONFIG.DASHBOARDS.SECRETARY, { replace: true });
+            return;
+          } else if (roleLower === 'finance') {
+            console.log('LOGIN DEBUG: Finance role detected, redirecting');
+            setIsLoading(false);
+            navigate(APP_CONFIG.DASHBOARDS.FINANCE, { replace: true });
+            return;
+          } else if (roleLower === 'business_management') {
+            console.log('LOGIN DEBUG: Business Management role detected, redirecting');
+            setIsLoading(false);
+            navigate(APP_CONFIG.DASHBOARDS.BUSINESS_MANAGEMENT, { replace: true });
+            return;
+          } else if (roleLower === 'auditor') {
+            console.log('LOGIN DEBUG: Auditor role detected, redirecting');
+            setIsLoading(false);
+            navigate(APP_CONFIG.DASHBOARDS.AUDITOR, { replace: true });
+            return;
+          } else if (roleLower === 'welfare') {
+            console.log('LOGIN DEBUG: Welfare role detected, redirecting');
+            setIsLoading(false);
+            navigate(APP_CONFIG.DASHBOARDS.WELFARE, { replace: true });
+            return;
+          } else if (roleLower === 'board_member') {
+            console.log('LOGIN DEBUG: Board Member role detected, redirecting');
+            setIsLoading(false);
+            navigate(APP_CONFIG.DASHBOARDS.BOARD_MEMBER, { replace: true });
+          return;
+        }
+      }
+
+        // If we get here, use the standard login flow
+        setLoginSuccess(true);
+        setIsLoading(false);
+    } catch (error) {
+        console.error('LOGIN DEBUG: Error in direct navigation check:', error);
+        // Fall back to useEffect navigation
+        setLoginSuccess(true);
+        setIsLoading(false);
+      }
     } catch (error: any) {
       console.error('LOGIN DEBUG: Unexpected error during login:', error);
       notify.error('An unexpected error occurred');
+      localStorage.setItem('tsa_login_error', 'Unexpected error during login');
       setIsLoading(false);
     }
   };

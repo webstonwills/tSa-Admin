@@ -57,16 +57,33 @@ const RoleBasedRoute: React.FC<RoleBasedRouteProps> = ({
   const { hasPermission, redirectPath } = useMemo(() => {
     // Get role with fallback to 'user'
     const currentRole = userRole || 'user';
+    
+    // Check if user is CEO by role or department
+    const isCEO = currentRole === 'ceo' || 
+                  user?.user_metadata?.department_code === 'CEO';
+    
+    // Special case for CEO accessing CEO dashboard 
+    if (isCEO && location.pathname === '/dashboard/ceo') {
+      console.log('RoleBasedRoute: CEO accessing CEO dashboard');
+      return {
+        hasPermission: true,
+        redirectPath: '/dashboard/ceo'
+      };
+    }
 
     // Check if user's role is allowed
     const hasAccess = allowedRoles.includes(currentRole) || 
                       allowedRoles.includes('*') || 
-                      currentRole === 'admin';
+                      currentRole === 'admin' ||
+                      (isCEO && allowedRoles.includes('ceo'));
     
     // Determine redirect path based on role and department
     let redirectTo;
     
-    if (roleToDashboardMap[currentRole]) {
+    if (isCEO) {
+      // CEO always goes to CEO dashboard
+      redirectTo = '/dashboard/ceo';
+    } else if (roleToDashboardMap[currentRole]) {
       // Role-based path for special roles
       redirectTo = roleToDashboardMap[currentRole];
     } else if (userProfile?.departmentId) {
@@ -79,6 +96,8 @@ const RoleBasedRoute: React.FC<RoleBasedRouteProps> = ({
     
     console.log('RoleBasedRoute: Access check:', { 
       currentRole, 
+      departmentCode: user?.user_metadata?.department_code,
+      isCEO,
       departmentId: userProfile?.departmentId,
       hasAccess, 
       allowedRoles: JSON.stringify(allowedRoles),
@@ -89,7 +108,7 @@ const RoleBasedRoute: React.FC<RoleBasedRouteProps> = ({
       hasPermission: hasAccess,
       redirectPath: redirectTo
     };
-  }, [userRole, userProfile, allowedRoles]);
+  }, [userRole, userProfile, allowedRoles, location.pathname]);
   
   // Track component mount state
   useEffect(() => {

@@ -48,6 +48,37 @@ const departmentCache = new Map<string, { name: string; code: string }>();
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+// Utility to safely get and set items in localStorage
+const safeLocalStorage = {
+  getItem: (key: string, defaultValue: string = ''): string => {
+    try {
+      const value = localStorage.getItem(key);
+      return value !== null ? value : defaultValue;
+    } catch (e) {
+      console.error('Failed to access localStorage:', e);
+      return defaultValue;
+    }
+  },
+  setItem: (key: string, value: string): boolean => {
+    try {
+      localStorage.setItem(key, value);
+      return true;
+    } catch (e) {
+      console.error('Failed to write to localStorage:', e);
+      return false;
+    }
+  },
+  removeItem: (key: string): boolean => {
+    try {
+      localStorage.removeItem(key);
+      return true;
+    } catch (e) {
+      console.error('Failed to remove from localStorage:', e);
+      return false;
+    }
+  }
+};
+
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<User | null>(null);
@@ -84,24 +115,50 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (isMounted.current) setUserRole(role);
   }, []);
 
-  // Memoize the fetchUserProfile function to prevent unnecessary recreations
-  const fetchUserProfile = useCallback(async (userId: string) => {
-    if (!userId) {
-      console.error('fetchUserProfile called with no userId');
-      return null;
+  // Enhanced profile fetching with retry mechanism
+  const fetchUserProfile = useCallback(async (userId: string, options = { retryCount: 2, useCache: true }): Promise<UserProfile | null> => {
+    const cacheKey = `profile_${userId}`;
+    
+    // Try to get from cache first if useCache is true
+    if (options.useCache) {
+      try {
+        const cachedProfile = safeLocalStorage.getItem(cacheKey);
+        if (cachedProfile) {
+          const profile = JSON.parse(cachedProfile) as UserProfile;
+          const cacheTime = parseInt(safeLocalStorage.getItem(`${cacheKey}_time`) || '0');
+          const now = Date.now();
+          
+          // Use cache if it's less than 5 minutes old
+          if (cacheTime && (now - cacheTime < 5 * 60 * 1000)) {
+            console.log('AUTH DEBUG: Using cached profile data');
+            safeSetUserProfile(profile);
+            safeSetUserRole(profile.role);
+            return profile;
+          }
+        }
+      } catch (e) {
+        console.error('AUTH DEBUG: Error reading cached profile:', e);
+      }
     }
     
-    try {
-      console.log('Fetching profile for user:', userId);
+    // Function to attempt fetch with timeout
+    const attemptFetch = async (attempt: number): Promise<UserProfile | null> => {
+      // Get the user's email from auth for verification
+      const { data: authUser } = await supabase.auth.getUser();
+      const authEmail = authUser?.user?.email;
       
-      // Get the authenticated user's email from the auth state
-      const { data: userData } = await supabase.auth.getUser();
-      const authEmail = userData?.user?.email;
+      console.log(`AUTH DEBUG: Fetching profile for user (attempt ${attempt}):`, userId);
       
-      console.log('Auth email:', authEmail);
+      // Timeout promise
+      const timeoutPromise = new Promise<any>((resolve) => {
+        setTimeout(() => {
+          console.log(`AUTH DEBUG: Profile fetch timeout on attempt ${attempt}`);
+          resolve(null);
+        }, attempt === 1 ? 5000 : 8000); // Longer timeout on retry
+      });
       
-      // Use a more efficient single query with a join for better performance
-      let { data: profileData, error: profileError } = await supabase
+      // Actual fetch promise
+      const fetchPromise = supabase
         .from('profiles')
         .select(`
           id, 
@@ -113,389 +170,182 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           departments:department_id (
             name,
             department_code
-          )
+          ),
+          approval_status,
+          approved_by,
+          approval_date,
+          rejection_reason
         `)
         .eq('id', userId)
         .single();
-
-      if (profileError) {
-        console.error('Error fetching user profile:', profileError);
-        // Check if this is a permissions error
-        if (profileError.code === 'PGRST301') {
-          notify.error('Permission denied when fetching profile', {
-            description: 'Please check your database RLS policies'
-          });
-        }
         
-        // If no profile found and we have auth email, try to find by email
-        if (authEmail) {
-          const { data: emailProfiles, error: emailError } = await supabase
-            .from('profiles')
-            .select('id, email, role')
-            .eq('email', authEmail);
-          
-          if (!emailError && emailProfiles && emailProfiles.length > 0) {
-            console.log('Found profile with matching email:', emailProfiles[0]);
-            
-            // Try to update the profile ID to match auth ID
-            const { error: updateError } = await supabase
-              .from('profiles')
-              .update({ id: userId })
-              .eq('id', emailProfiles[0].id);
-              
-            if (updateError) {
-              console.error('Error updating profile ID:', updateError);
-            } else {
-              console.log('Profile ID updated to match auth ID');
-              // Retry fetching with the updated ID
-              return await fetchUserProfile(userId);
-            }
-          }
-        }
-        
-        return null;
-      }
-
-      if (!profileData) {
-        console.warn('No profile found for user:', userId);
-        
-        // Add debugging: Check if there are ANY profiles in the database for this user
-        const { data: allProfiles, error: allProfilesError } = await supabase
-          .from('profiles')
-          .select('id, email, role')
-          .limit(10);
-          
-        if (allProfilesError) {
-          console.error('Error fetching sample profiles:', allProfilesError);
-        } else {
-          console.log('Sample of available profiles:', allProfiles);
-          
-          // Check if there's a profile with matching email
-          if (authEmail && allProfiles) {
-            const matchingEmailProfile = allProfiles.find(profile => profile.email === authEmail);
-            if (matchingEmailProfile) {
-              console.log('Found profile with matching email but different ID:', matchingEmailProfile);
-              
-              // Try to fetch this profile instead
-              const { data: correctProfile, error: correctProfileError } = await supabase
-                .from('profiles')
-                .select(`
-                  id, 
-                  first_name, 
-                  last_name, 
-                  email, 
-                  role, 
-                  department_id,
-                  departments:department_id (
-                    name,
-                    department_code
-                  )
-                `)
-                .eq('id', matchingEmailProfile.id)
-                .single();
-                
-              if (!correctProfileError && correctProfile) {
-                console.log('Successfully retrieved profile with matching email:', correctProfile);
-                
-                // Update the auth user ID to match the profile
-                try {
-                  // We can't directly change the Supabase auth ID, but we can make
-                  // the profile ID match what the auth system expects
-                  const { error: updateError } = await supabase
-                    .from('profiles')
-                    .update({ id: userId })
-                    .eq('id', matchingEmailProfile.id);
-                    
-                if (updateError) {
-                  console.error('Error updating profile ID:', updateError);
-                } else {
-                  console.log('Profile ID updated to match auth ID');
-                  // Now fetch the profile with the updated ID
-                  return await fetchUserProfile(userId);
-                }
-              } catch (updateError) {
-                console.error('Error updating profile ID:', updateError);
-              }
-              
-              profileData = correctProfile;
-            }
-          }
-        }
-      }
+      // Race between timeout and fetch
+      const result = await Promise.race([fetchPromise, timeoutPromise]);
       
-      // If no matching profile found, check if we need to create one
-      if (!profileData && authEmail) {
-        // Try to create a profile for this user
-        console.log('Creating new profile for user:', userId);
+      // If timeout won or there was an error
+      if (!result || result.error) {
+        if (attempt < options.retryCount) {
+          console.log(`AUTH DEBUG: Retrying profile fetch, attempt ${attempt + 1}`);
+          return attemptFetch(attempt + 1);
+        }
+        
+        // Use fallback after all retries
+        const fallbackProfile: UserProfile = {
+          id: userId,
+          firstName: '',
+          lastName: '',
+          email: authEmail || '',
+          role: 'user',
+          departmentId: null,
+          departmentCode: null,
+          departmentName: null,
+          approvalStatus: APPROVAL_STATUS.PENDING,
+          approvedBy: null,
+          approvalDate: null,
+          rejectionReason: null
+        };
+        
+        // Try to get role from auth metadata
         try {
-          const { data: authUser } = await supabase.auth.getUser();
-          const userData = authUser?.user?.user_metadata || {};
-          
-          const { data: newProfile, error: createError } = await supabase
-            .from('profiles')
-            .insert({
-              id: userId,
-              email: authEmail,
-              first_name: userData.first_name || '',
-              last_name: userData.last_name || '',
-              role: 'user'
-            })
-            .select()
-            .single();
-            
-          if (createError) {
-            console.error('Error creating profile:', createError);
-          } else if (newProfile) {
-            console.log('Created new profile:', newProfile);
-            // Fetch the full profile with departments to avoid type errors
-            return await fetchUserProfile(userId);
+          const { data: authData } = await supabase.auth.getUser();
+          if (authData?.user?.user_metadata?.role) {
+            fallbackProfile.role = authData.user.user_metadata.role;
           }
-        } catch (createError) {
-          console.error('Error creating profile:', createError);
+        } catch (e) {
+          console.error('AUTH DEBUG: Failed to get role from metadata', e);
         }
+        
+        return fallbackProfile;
       }
       
-      // If still no profile, return null
-      if (!profileData) {
-        return null;
-      }
-    }
-
-    // Ensure email matches authenticated user
-    if (authEmail && profileData.email !== authEmail) {
-      console.warn(`Profile email (${profileData.email}) doesn't match authenticated user (${authEmail})`);
+      // Map database record to UserProfile
+      const profileData = result.data;
+      const profile: UserProfile = {
+        id: profileData.id,
+        firstName: profileData.first_name || '',
+        lastName: profileData.last_name || '',
+        email: profileData.email || authEmail || '',
+        role: profileData.role || 'user',
+        departmentId: profileData.department_id,
+        departmentCode: profileData.departments?.department_code || null,
+        departmentName: profileData.departments?.name || null,
+        approvalStatus: profileData.role === 'ceo' || profileData.departments?.department_code === 'CEO' 
+          ? APPROVAL_STATUS.APPROVED 
+          : profileData.approval_status || APPROVAL_STATUS.PENDING,
+        approvedBy: profileData.approved_by || null,
+        approvalDate: profileData.approval_date || null,
+        rejectionReason: profileData.rejection_reason || null
+      };
       
-      // Try to update the profile email to match auth email
-      try {
-        const { error: updateError } = await supabase
-          .from('profiles')
-          .update({ email: authEmail })
-          .eq('id', userId);
-          
-        if (updateError) {
-          console.error('Error updating profile email:', updateError);
-        } else {
-          console.log('Profile email updated to match auth email');
-          profileData.email = authEmail;
-        }
-      } catch (updateError) {
-        console.error('Error updating profile email:', updateError);
-      }
-    }
-
-    console.log('Profile data received:', profileData);
-
-    // Map the response to our UserProfile interface
-    const profile: UserProfile = {
-      id: profileData.id,
-      firstName: profileData.first_name,
-      lastName: profileData.last_name,
-      email: profileData.email,
-      role: profileData.role || 'user',
-      departmentId: profileData.department_id,
-      departmentCode: profileData.departments?.department_code || null,
-      departmentName: profileData.departments?.name || null,
-      approvalStatus: profileData.role === 'ceo' || profileData.departments?.department_code === 'CEO' 
-        ? APPROVAL_STATUS.APPROVED 
-        : APPROVAL_STATUS.PENDING,
-      approvedBy: null,
-      approvalDate: null,
-      rejectionReason: null
+      return profile;
     };
-
-    // Cache this department for future reference
-    if (profileData.department_id && profileData.departments) {
-      departmentCache.set(profileData.department_id, {
-        name: profileData.departments.name,
-        code: profileData.departments.department_code
-      });
+    
+    try {
+      // Start fetch attempt
+      const profile = await attemptFetch(1);
+      
+      if (profile) {
+        // Update state
+        safeSetUserProfile(profile);
+        safeSetUserRole(profile.role);
+        
+        // Cache the profile
+        safeLocalStorage.setItem(cacheKey, JSON.stringify(profile));
+        safeLocalStorage.setItem(`${cacheKey}_time`, Date.now().toString());
+        safeLocalStorage.setItem('userRole', profile.role);
+        
+        return profile;
+      }
+      
+      return null;
+    } catch (error) {
+      console.error('AUTH DEBUG: Error in fetchUserProfile:', error);
+      return null;
     }
+  }, [safeSetUserProfile, safeSetUserRole]);
 
-    // Store the role in localStorage too for debugging and resilience
-    localStorage.setItem('userRole', profile.role);
+  // Simplified refreshProfile function
+  const refreshProfile = useCallback(async (): Promise<void> => {
+    if (!user || refreshInProgress.current) {
+      return;
+    }
     
-    // Use safe setState methods
-    safeSetUserProfile(profile);
-    safeSetUserRole(profile.role);
-    
-    console.log('Profile processed and state updated:', profile);
-    
-    return profile;
-  } catch (error) {
-    console.error('Error in fetchUserProfile:', error);
-    return null;
-  }
-}, [safeSetUserProfile, safeSetUserRole]);
-
-// Refresh the user's profile - declaring this early to fix the linter error
-const refreshProfile = useCallback(async (): Promise<void> => {
-  // If no user, wait a bit to see if the user state gets updated
-  if (!user) {
-    console.log('refreshProfile: Waiting for user state to be available...');
-    
-    // Wait for a short time to see if user gets set
-    return new Promise<void>((resolve) => {
-      let checkCount = 0;
-      const waitForUser = setInterval(() => {
-        checkCount++;
-        if (user) {
-          clearInterval(waitForUser);
-          console.log('refreshProfile: User state became available, continuing refresh');
-          // User is now available, proceed with refresh
-          refreshInProgress.current = true;
-          fetchUserProfile(user.id)
-            .then(profile => {
-              if (profile) {
-                console.log('Profile refreshed successfully with role:', profile.role);
-              }
-              resolve();
-            })
-            .catch(error => {
-              console.error('Error refreshing profile after waitForUser:', error);
-              resolve();
-            })
-            .finally(() => {
-              refreshInProgress.current = false;
-            });
-        } else if (checkCount > 10) { // Check for ~2 seconds
-          // Give up after multiple attempts
-          clearInterval(waitForUser);
-          console.warn('refreshProfile called but no user became available after waiting');
-          resolve();
-        }
-      }, 200);
-    });
-  }
-  
-  // Prevent concurrent refresh calls
-  if (refreshInProgress.current) {
-    console.log('refreshProfile: Already in progress, skipping');
-    return;
-  }
-  
-  try {
     refreshInProgress.current = true;
     
-    // Check both user metadata and profile data for CEO indication
-    const { data: authUser } = await supabase.auth.getUser();
-    const userMetadata = authUser?.user?.user_metadata || {};
-    
-    // First check if we need to fix CEO role assignment
-    const { data: profileData, error: profileError } = await supabase
-      .from('profiles')
-      .select(`
-        id, 
-        role, 
-        department_id,
-        departments:department_id (
-          name,
-          department_code
-        )
-      `)
-      .eq('id', user.id)
-      .single();
-      
-    console.log('refreshProfile: Current profile data:', profileData);
-    console.log('refreshProfile: User metadata:', userMetadata);
-    
-    // Check for CEO indicators in multiple places
-    const isCEODepartment = profileData?.departments?.department_code === 'CEO';
-    const isCEORole = (profileData?.role || '').toLowerCase() === 'ceo';
-    const isCEOMetadata = (userMetadata?.department_code || '').toUpperCase() === 'CEO';
-    
-    console.log('refreshProfile: CEO indicators - Department:', isCEODepartment, 'Role:', isCEORole, 'Metadata:', isCEOMetadata);
-    
-    // If any CEO indicator is true but role isn't set as CEO, update the role
-    if ((isCEODepartment || isCEOMetadata) && !isCEORole) {
-      console.log('refreshProfile: Fixing CEO role assignment');
-      
-      const { error: updateError } = await supabase
-        .from('profiles')
-        .update({ role: 'ceo' })
-        .eq('id', user.id);
-        
-      if (updateError) {
-        console.error('refreshProfile: Error updating CEO role:', updateError);
-      } else {
-        console.log('refreshProfile: CEO role fixed successfully');
-      }
+    try {
+      await fetchUserProfile(user.id, { retryCount: 1, useCache: false });
+    } finally {
+      refreshInProgress.current = false;
     }
-    
-    const profile = await fetchUserProfile(user.id);
-    if (profile) {
-      console.log('Profile refreshed successfully with role:', profile.role);
-    }
-  } finally {
-    refreshInProgress.current = false;
-  }
-}, [user, fetchUserProfile]);
+  }, [user, fetchUserProfile]);
 
-// Optimize the updateProfile function
-const updateProfile = useCallback(async (data: Partial<UserProfile>): Promise<boolean> => {
-  if (!user) return false;
-  
-  try {
-    // Convert from camelCase to snake_case for database
-    const dbData: any = {};
-    if (data.firstName !== undefined) dbData.first_name = data.firstName;
-    if (data.lastName !== undefined) dbData.last_name = data.lastName;
-    if (data.email !== undefined) dbData.email = data.email;
-    if (data.departmentId !== undefined) dbData.department_id = data.departmentId;
+  // Optimize the updateProfile function
+  const updateProfile = useCallback(async (data: Partial<UserProfile>): Promise<boolean> => {
+    if (!user) return false;
     
-    const { error } = await supabase
-      .from('profiles')
-      .update(dbData)
-      .eq('id', user.id);
-    
-    if (error) {
-      console.error('Error updating profile:', error);
-      notify.error('Failed to update profile', {
-        description: 'There was a problem updating your profile information'
+    try {
+      // Convert from camelCase to snake_case for database
+      const dbData: any = {};
+      if (data.firstName !== undefined) dbData.first_name = data.firstName;
+      if (data.lastName !== undefined) dbData.last_name = data.lastName;
+      if (data.email !== undefined) dbData.email = data.email;
+      if (data.departmentId !== undefined) dbData.department_id = data.departmentId;
+      
+      const { error } = await supabase
+        .from('profiles')
+        .update(dbData)
+        .eq('id', user.id);
+      
+      if (error) {
+        console.error('Error updating profile:', error);
+        notify.error('Failed to update profile', {
+          description: 'There was a problem updating your profile information'
+        });
+        return false;
+      }
+      
+      // Create updated profile first, then update state
+      if (userProfile) {
+        const updatedProfile: UserProfile = {
+          ...userProfile,
+          firstName: data.firstName !== undefined ? data.firstName : userProfile.firstName,
+          lastName: data.lastName !== undefined ? data.lastName : userProfile.lastName,
+          email: data.email !== undefined ? data.email : userProfile.email,
+          departmentId: data.departmentId !== undefined ? data.departmentId : userProfile.departmentId,
+        };
+        
+        // Update the local state with the new profile
+        safeSetUserProfile(updatedProfile);
+      }
+      
+      // Only fetch the profile again if department changed (since we need updated department name)
+      if (data.departmentId) {
+        await refreshProfile();
+      }
+      
+      notify.success('Profile updated successfully', {
+        description: 'Your profile information has been saved'
+      });
+      return true;
+    } catch (error) {
+      console.error('Error in updateProfile:', error);
+      notify.error('An unexpected error occurred', {
+        description: 'Could not verify profile update'
       });
       return false;
     }
-    
-    // Create updated profile first, then update state
-    if (userProfile) {
-      const updatedProfile: UserProfile = {
-        ...userProfile,
-        firstName: data.firstName !== undefined ? data.firstName : userProfile.firstName,
-        lastName: data.lastName !== undefined ? data.lastName : userProfile.lastName,
-        email: data.email !== undefined ? data.email : userProfile.email,
-        departmentId: data.departmentId !== undefined ? data.departmentId : userProfile.departmentId,
-      };
-      
-      // Update the local state with the new profile
-      safeSetUserProfile(updatedProfile);
-    }
-    
-    // Only fetch the profile again if department changed (since we need updated department name)
-    if (data.departmentId) {
-      await refreshProfile();
-    }
-    
-    notify.success('Profile updated successfully', {
-      description: 'Your profile information has been saved'
-    });
-    return true;
-  } catch (error) {
-    console.error('Error in updateProfile:', error);
-    notify.error('An unexpected error occurred', {
-      description: 'Could not verify profile update'
-    });
-    return false;
-  }
-}, [user, refreshProfile, safeSetUserProfile]);
+  }, [user, refreshProfile, safeSetUserProfile]);
 
-// Validate stored session on mount
-useEffect(() => {
-  // Skip if already initialized
-  if (isInitialized) return;
-  
+  // Enhanced validateSessionAndUser method
   const validateSessionAndUser = async () => {
     try {
       console.log('Initializing auth session');
       safeSetLoading(true);
+      
+      // Check for login flags in localStorage
+      const isLoginInProgress = safeLocalStorage.getItem('tsa_login_in_progress') === 'true';
+      const lastLoginEmail = safeLocalStorage.getItem('tsa_last_login_email');
+      const lastLoginError = safeLocalStorage.getItem('tsa_login_error');
       
       // Get session from Supabase
       const { data } = await supabase.auth.getSession();
@@ -503,8 +353,34 @@ useEffect(() => {
       // Log the session state
       if (data.session) {
         console.log('Session found:', data.session.user.id);
+        
+        // Direct CEO redirection for initial loads
+        // This helps if the CEO is already logged in but got redirected to login page
+        const userMeta = data.session.user.user_metadata;
+        const isCEO = userMeta?.role === 'ceo' || userMeta?.department_code === 'CEO';
+        const currentPath = window.location.pathname;
+        const isAuthPage = currentPath.includes('/auth/login') || 
+                           window.location.hash.includes('/auth/login') || 
+                           currentPath.includes('/auth/pending-approval') ||
+                           window.location.hash.includes('/auth/pending-approval');
+        
+        if (isCEO && isAuthPage) {
+          console.log('AUTH DEBUG: CEO detected on login/pending page, redirecting to dashboard');
+          const baseUrl = window.location.origin;
+          // Use hash routing pattern
+          window.location.href = `${baseUrl}/#/dashboard/ceo`;
+          return;
+        }
       } else {
         console.log('No active session found');
+        
+        // If login was in progress but we have no session, something failed
+        if (isLoginInProgress && lastLoginError) {
+          console.error('Login was in progress but failed:', lastLoginError);
+          notify.error('Login failed', { description: lastLoginError });
+          safeLocalStorage.removeItem('tsa_login_in_progress');
+          safeLocalStorage.removeItem('tsa_login_error');
+        }
       }
       
       // Update state if component is still mounted
@@ -513,271 +389,352 @@ useEffect(() => {
       setUser(data.session?.user ?? null);
         
         if (data.session?.user) {
-          // Fetch user profile if we have a session
-          try {
-            // First check if we need to fix the CEO role assignment
-            const { data: profileData, error: profileError } = await supabase
-              .from('profiles')
-              .select('id, role, department_id, departments(department_code)')
-              .eq('id', data.session.user.id)
-              .single();
-              
-            if (!profileError && profileData) {
-              // Check if there's a mismatch between role and department code
-              if (profileData.departments?.department_code === 'CEO' && profileData.role !== 'ceo') {
-                console.log('Fixing CEO role assignment - department is CEO but role is', profileData.role);
-                
-                // Update the profile to have the correct CEO role
-                await supabase
-                  .from('profiles')
-                  .update({ role: 'ceo' })
-                  .eq('id', data.session.user.id);
-                  
-                console.log('CEO role fixed');
-              }
-            }
-            
-            await fetchUserProfile(data.session.user.id);
-          } catch (profileError) {
-            console.error('Error fetching initial profile:', profileError);
+          // Try to load cached role first for immediate UI response
+          const cachedRole = safeLocalStorage.getItem('tsa_user_role');
+          if (cachedRole) {
+            safeSetUserRole(cachedRole);
           }
+          
+          // Fetch user profile in background (or use cache)
+          fetchUserProfile(data.session.user.id).catch(error => {
+            console.error('Error in initial profile fetch, continuing:', error);
+          });
+        } else {
+          // Clear state on no session
+          safeSetUserProfile(null);
+          safeSetUserRole('');
+          safeLocalStorage.removeItem('userRole');
+          safeLocalStorage.removeItem('tsa_user_role');
+          safeLocalStorage.removeItem('tsa_user_status');
         }
         
         // Mark session as checked and initialization complete
         setSessionChecked(true);
         setIsInitialized(true);
       }
+
+      // Check if we're continuing from a login process
+      if (isLoginInProgress && data.session) {
+        console.log('AUTH DEBUG: Detected successful login, completing process');
+        safeLocalStorage.removeItem('tsa_login_in_progress');
+        
+        // Show success notification
+        notify.success('Authentication successful', {
+          description: 'Your profile is being loaded in the background'
+        });
+      }
     } catch (error) {
-      console.error("Error getting initial session:", error);
+      console.error("Error in validateSessionAndUser:", error);
       // Mark session as checked even if there was an error
       if (isMounted.current) {
         setSessionChecked(true);
+        setIsInitialized(true);
       }
     } finally {
       safeSetLoading(false);
     }
   };
 
-  validateSessionAndUser();
-
-    // Listen for auth changes
-  const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, nextSession) => {
-    try {
-      console.log("Auth state change event:", event);
-      
-      // Only set loading for critical auth events
-      if (event === 'SIGNED_IN' || event === 'SIGNED_OUT' || event === 'USER_UPDATED') {
-        safeSetLoading(true);
-      }
-      
-      // Guard against state updates after unmount
-      if (!isMounted.current) return;
-      
-      setSession(nextSession);
-      setUser(nextSession?.user ?? null);
-      
-      if (nextSession?.user) {
-        await fetchUserProfile(nextSession.user.id);
-      } else {
-        safeSetUserProfile(null);
-        safeSetUserRole('');
-        // Clear cached role
-        localStorage.removeItem('userRole');
-      }
-    } catch (error) {
-      console.error("Error in auth state change:", error);
-    } finally {
-      if (event === 'SIGNED_IN' || event === 'SIGNED_OUT' || event === 'USER_UPDATED') {
-        safeSetLoading(false);
-      }
-    }
-    });
-
-    return () => {
-      subscription.unsubscribe();
-    };
-}, [isInitialized, fetchUserProfile, safeSetLoading, safeSetUserProfile, safeSetUserRole]);
-
-const signOut = useCallback(async () => {
-  try {
-    safeSetLoading(true);
-    await supabase.auth.signOut();
-    safeSetUserProfile(null);
-    safeSetUserRole('');
-    
-    // Clear any stored role data
-    localStorage.removeItem('userRole');
-    
-    // Navigate to login after successful sign-out
-    navigate('/auth/login');
-    notify.success('Signed out successfully', {
-      description: 'You have been safely logged out'
-    });
-  } catch (error) {
-    console.error("Error signing out:", error);
-    notify.error("Failed to sign out", {
-      description: "Please try again or close your browser to ensure you're logged out"
-    });
-  } finally {
-    safeSetLoading(false);
-  }
-}, [navigate, safeSetLoading, safeSetUserProfile, safeSetUserRole]);
-
-// Add a method to ensure profile integrity and privacy
-const forceCorrectProfile = useCallback(async (): Promise<boolean> => {
-  if (!user) return false;
-  
-  try {
-    console.log('Ensuring profile data integrity for:', user.email);
-    
-    // Get user metadata which might have role/department info
-    const { data: authData } = await supabase.auth.getUser();
-    const userMetadata = authData?.user?.user_metadata || {};
-    console.log('User metadata from auth:', userMetadata);
-    
-    // Find profiles with matching email
-    const { data: profiles, error } = await supabase
-      .from('profiles')
-      .select(`
-        *,
-        departments:department_id (
-          name,
-          department_code
-        )
-      `)
-      .eq('email', user.email);
-      
-    if (error) {
-      console.error('Error verifying profile integrity:', error);
-      return false;
-    }
-    
-    if (!profiles || profiles.length === 0) {
-      console.log('No profiles found with email:', user.email);
-      
-      // Check if this is a CEO based on metadata
-      let role = 'user';
-      const departmentCode = userMetadata?.department_code || '';
-      
-      if (departmentCode.toUpperCase() === 'CEO') {
-        role = 'ceo';
-        console.log('Setting role to CEO based on metadata');
-      }
-      
-      // Create a new profile if none exists
+  // Improved auth state change handler
+  const setupAuthSubscription = useCallback(() => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, nextSession) => {
       try {
-        const { data: newProfile, error: createError } = await supabase
-          .from('profiles')
-          .insert({
-            id: user.id,
-            email: user.email,
-            first_name: userMetadata.first_name || '',
-            last_name: userMetadata.last_name || '',
-            role: role,
-            department_id: userMetadata.department_id || null
-          })
-          .select()
-          .single();
+        console.log("Auth state change event:", event);
+        
+        // Only set loading for critical auth events
+        if (event === 'SIGNED_IN' || event === 'SIGNED_OUT' || event === 'USER_UPDATED') {
+          safeSetLoading(true);
+        }
+        
+        // Guard against state updates after unmount
+        if (!isMounted.current) return;
+        
+        // Update session and user state immediately
+        setSession(nextSession);
+        setUser(nextSession?.user ?? null);
+        
+        if (nextSession?.user) {
+          // Check for CEO redirect flag
+          const isCEORedirect = safeLocalStorage.getItem('tsa_ceo_redirect') === 'true';
           
-        if (createError) {
-          console.error('Error creating new profile:', createError);
+          // Try to get role from metadata for immediate UI response
+          const role = nextSession.user.user_metadata?.role;
+          const departmentCode = nextSession.user.user_metadata?.department_code;
+          const isCEO = role === 'ceo' || departmentCode === 'CEO';
+          
+          if (role) {
+            safeSetUserRole(role);
+            safeLocalStorage.setItem('tsa_user_role', role);
+          }
+          
+          // Special handling for CEOs to avoid redirection issues
+          if (isCEO && isCEORedirect) {
+            console.log('AUTH DEBUG: Detected CEO redirect flag, confirming redirect');
+            
+            // Clear the flag immediately to prevent loops
+            safeLocalStorage.removeItem('tsa_ceo_redirect');
+            
+            // Check if we're already on the CEO dashboard
+            const currentPath = window.location.pathname;
+            const currentHash = window.location.hash;
+            
+            if (!currentPath.includes('/dashboard/ceo') && !currentHash.includes('/dashboard/ceo')) {
+              console.log('AUTH DEBUG: CEO not on dashboard, redirecting');
+              
+              // Ensure we use hash router format
+              const baseUrl = window.location.origin;
+              window.location.href = `${baseUrl}/#/dashboard/ceo`;
+              return;
+            }
+          }
+          
+          // Fetch profile in background
+          fetchUserProfile(nextSession.user.id).catch(error => {
+            console.error('Error fetching profile after auth state change:', error);
+          });
+        } else {
+          // Clear state on sign out
+          safeSetUserProfile(null);
+          safeSetUserRole('');
+          safeLocalStorage.removeItem('userRole');
+          safeLocalStorage.removeItem('tsa_user_role');
+          safeLocalStorage.removeItem('tsa_user_status');
+        }
+      } catch (error) {
+        console.error("Error in auth state change:", error);
+      } finally {
+        if (event === 'SIGNED_IN' || event === 'SIGNED_OUT' || event === 'USER_UPDATED') {
+          safeSetLoading(false);
+        }
+      }
+    });
+    
+    return subscription;
+  }, [fetchUserProfile, safeSetLoading, safeSetUserProfile, safeSetUserRole]);
+
+  const signOut = useCallback(async () => {
+    try {
+      safeSetLoading(true);
+    await supabase.auth.signOut();
+      safeSetUserProfile(null);
+      safeSetUserRole('');
+      
+      // Clear any stored role data
+      localStorage.removeItem('userRole');
+      
+      // Navigate to login after successful sign-out
+    navigate('/auth/login');
+      notify.success('Signed out successfully', {
+        description: 'You have been safely logged out'
+      });
+    } catch (error) {
+      console.error("Error signing out:", error);
+      notify.error("Failed to sign out", {
+        description: "Please try again or close your browser to ensure you're logged out"
+      });
+    } finally {
+      safeSetLoading(false);
+    }
+  }, [navigate, safeSetLoading, safeSetUserProfile, safeSetUserRole]);
+
+  // Add a method to ensure profile integrity and privacy
+  const forceCorrectProfile = useCallback(async (): Promise<boolean> => {
+    if (!user) return false;
+    
+    try {
+      console.log('Ensuring profile data integrity for:', user.email);
+      
+      // Get user metadata which might have role/department info
+      const { data: authData } = await supabase.auth.getUser();
+      const userMetadata = authData?.user?.user_metadata || {};
+      console.log('User metadata from auth:', userMetadata);
+      
+      // Find profiles with matching email
+      const { data: profiles, error } = await supabase
+        .from('profiles')
+        .select(`
+          *,
+          departments:department_id (
+            name,
+            department_code
+          )
+        `)
+        .eq('email', user.email);
+        
+      if (error) {
+        console.error('Error verifying profile integrity:', error);
+        return false;
+      }
+      
+      if (!profiles || profiles.length === 0) {
+        console.log('No profiles found with email:', user.email);
+        
+        // Check if this is a CEO based on metadata
+        let role = 'user';
+        const departmentCode = userMetadata?.department_code || '';
+        
+        if (departmentCode.toUpperCase() === 'CEO') {
+          role = 'ceo';
+          console.log('Setting role to CEO based on metadata');
+        }
+        
+        // Create a new profile if none exists
+        try {
+          const { data: newProfile, error: createError } = await supabase
+            .from('profiles')
+            .insert({
+              id: user.id,
+              email: user.email,
+              first_name: userMetadata.first_name || '',
+              last_name: userMetadata.last_name || '',
+              role: role,
+              department_id: userMetadata.department_id || null
+            })
+            .select()
+            .single();
+            
+          if (createError) {
+            console.error('Error creating new profile:', createError);
+            return false;
+          }
+          
+          console.log('Created new profile to maintain data integrity:', newProfile);
+          await refreshProfile();
+          return true;
+        } catch (createError) {
+          console.error('Error creating profile:', createError);
+          return false;
+        }
+      }
+      
+      console.log('Found profiles with matching email:', profiles);
+      
+      // Check if any profile indicates a CEO role
+      const ceoProfile = profiles.find(p => 
+        p.role?.toLowerCase() === 'ceo' || 
+        p.departments?.department_code === 'CEO'
+      );
+      
+      // Prefer CEO profile if one exists
+      const matchingProfile = ceoProfile || profiles[0];
+      console.log('Selected profile for update:', matchingProfile);
+      
+      // Update the profile ID to match auth ID
+      if (matchingProfile.id !== user.id) {
+        // Preserve CEO role and department assignments when updating
+        const updateData: any = { id: user.id };
+        
+        // Preserve CEO role if present
+        if (ceoProfile && ceoProfile.id === matchingProfile.id) {
+          updateData.role = 'ceo';
+        }
+        
+        const { error: updateError } = await supabase
+          .from('profiles')
+          .update(updateData)
+          .eq('id', matchingProfile.id);
+          
+        if (updateError) {
+          console.error('Error updating profile association:', updateError);
           return false;
         }
         
-        console.log('Created new profile to maintain data integrity:', newProfile);
-        await refreshProfile();
-        return true;
-      } catch (createError) {
-        console.error('Error creating profile:', createError);
-        return false;
+        console.log('Profile association updated for proper security mapping');
       }
+      
+      // Now fetch the profile again
+      await refreshProfile();
+      return true;
+    } catch (error) {
+      console.error('Error in profile integrity check:', error);
+      return false;
     }
-    
-    console.log('Found profiles with matching email:', profiles);
-    
-    // Check if any profile indicates a CEO role
-    const ceoProfile = profiles.find(p => 
-      p.role?.toLowerCase() === 'ceo' || 
-      p.departments?.department_code === 'CEO'
-    );
-    
-    // Prefer CEO profile if one exists
-    const matchingProfile = ceoProfile || profiles[0];
-    console.log('Selected profile for update:', matchingProfile);
-    
-    // Update the profile ID to match auth ID
-    if (matchingProfile.id !== user.id) {
-      // Preserve CEO role and department assignments when updating
-      const updateData: any = { id: user.id };
-      
-      // Preserve CEO role if present
-      if (ceoProfile && ceoProfile.id === matchingProfile.id) {
-        updateData.role = 'ceo';
-      }
-      
-      const { error: updateError } = await supabase
-        .from('profiles')
-        .update(updateData)
-        .eq('id', matchingProfile.id);
-        
-      if (updateError) {
-        console.error('Error updating profile association:', updateError);
-        return false;
-      }
-      
-      console.log('Profile association updated for proper security mapping');
-    }
-    
-    // Now fetch the profile again
-    await refreshProfile();
-    return true;
-  } catch (error) {
-    console.error('Error in profile integrity check:', error);
-    return false;
-  }
-}, [user, refreshProfile]);
+  }, [user, refreshProfile]);
 
-// Helper function for approval status
-const isApproved = useCallback(() => {
-  if (!userProfile) return false;
-  // CEO users are automatically approved
-  if (userProfile.role === 'ceo' || userProfile.departmentCode === 'CEO') return true;
-  return userProfile.approvalStatus === APPROVAL_STATUS.APPROVED;
-}, [userProfile]);
+  // Helper function for approval status
+  const isApproved = useCallback(() => {
+    if (!userProfile) return false;
+    // CEO users are automatically approved
+    if (userProfile.role === 'ceo' || userProfile.departmentCode === 'CEO') return true;
+    return userProfile.approvalStatus === APPROVAL_STATUS.APPROVED;
+  }, [userProfile]);
 
-const isPending = useCallback(() => {
-  if (!userProfile) return false;
-  // CEO users are never pending
-  if (userProfile.role === 'ceo' || userProfile.departmentCode === 'CEO') return false;
-  return userProfile.approvalStatus === APPROVAL_STATUS.PENDING || !userProfile.approvalStatus;
-}, [userProfile]);
+  const isPending = useCallback(() => {
+    if (!userProfile) return false;
+    // CEO users are never pending
+    if (userProfile.role === 'ceo' || userProfile.departmentCode === 'CEO') return false;
+    return userProfile.approvalStatus === APPROVAL_STATUS.PENDING || !userProfile.approvalStatus;
+  }, [userProfile]);
 
-const isRejected = useCallback(() => {
-  if (!userProfile) return false;
-  return userProfile.approvalStatus === APPROVAL_STATUS.REJECTED;
-}, [userProfile]);
+  const isRejected = useCallback(() => {
+    if (!userProfile) return false;
+    return userProfile.approvalStatus === APPROVAL_STATUS.REJECTED;
+  }, [userProfile]);
 
-const isCEO = useCallback(() => {
-  if (!userProfile) return false;
-  return userProfile.role === 'ceo' || userProfile.departmentCode === 'CEO';
-}, [userProfile]);
+  const isCEO = useCallback(() => {
+    if (!userProfile) return false;
+    return userProfile.role === 'ceo' || userProfile.departmentCode === 'CEO';
+  }, [userProfile]);
 
   const value = {
     session,
     user,
-  userProfile,
-  userRole: userRole || 'user', // Ensure there's always a default role
-  loading: loading || !sessionChecked, // Consider loading until session is checked
+    userProfile,
+    userRole: userRole || 'user', // Ensure there's always a default role
+    loading: loading || !sessionChecked, // Consider loading until session is checked
     signOut,
-  updateProfile,
-  refreshProfile,
-  // Add a method to ensure profile integrity and privacy
-  forceCorrectProfile,
-  isApproved,
-  isPending,
-  isRejected,
-  isCEO
-  };
+    updateProfile,
+    refreshProfile,
+    // Add a method to ensure profile integrity and privacy
+    forceCorrectProfile,
+    isApproved,
+    isPending,
+    isRejected,
+    isCEO
+    };
+
+    // Effect for initial session validation and auth subscription setup
+    useEffect(() => {
+      // Skip if already initialized
+      if (isInitialized) return;
+      
+      // Initialize auth and validate session
+      const initAuth = async () => {
+        await validateSessionAndUser();
+      };
+      
+      initAuth();
+      
+      // Set up auth subscription
+      const subscription = setupAuthSubscription();
+      
+      return () => {
+        subscription.unsubscribe();
+      };
+    }, [isInitialized, validateSessionAndUser, setupAuthSubscription]);
+
+    // Background sync effect
+    useEffect(() => {
+      // Only set up sync if we're initialized and have a user
+      if (!isInitialized || !user) return;
+      
+      console.log('Setting up background profile sync');
+      
+      // Set up periodic profile refresh
+      const intervalId = setInterval(() => {
+        // Only refresh if not in progress and we have a user
+        if (!refreshInProgress.current && user) {
+          console.log('Background profile sync triggered');
+          refreshProfile().catch(error => {
+            console.error('Background sync error:', error);
+          });
+        }
+      }, 5 * 60 * 1000); // Every 5 minutes
+      
+      return () => {
+        clearInterval(intervalId);
+      };
+    }, [isInitialized, user, refreshProfile]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };

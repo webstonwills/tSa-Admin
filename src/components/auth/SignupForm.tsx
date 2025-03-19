@@ -108,9 +108,136 @@ const SignupForm: React.FC = () => {
     return 'bg-green-500';
   };
 
-  // Fetch departments on component mount
+  // Fetch departments function
+  const fetchDepartments = async () => {
+    setIsDepartmentsLoading(true);
+    
+    try {
+      // First try to load from local storage
+      try {
+        const cachedDepartments = localStorage.getItem('tsa_departments');
+        if (cachedDepartments) {
+          const parsedDepartments = JSON.parse(cachedDepartments);
+          console.log('PERF DEBUG: Using cached departments from local storage');
+          setDepartments(parsedDepartments);
+          setIsDepartmentsLoading(false);
+          return; // Exit early with cached data
+        }
+      } catch (storageError) {
+        console.error('PERF DEBUG: Error reading cached departments:', storageError);
+      }
+      
+      console.log('PERF DEBUG: Fetching departments at', new Date().toISOString());
+      
+      // Set up a timeout promise
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Department fetch timed out')), 5000)
+      );
+      
+      // Create the database fetch promise
+      const fetchPromise = supabase
+        .from('departments')
+        .select('id, name, department_code')
+        .order('name');
+      
+      // Race between the fetch and the timeout
+      const { data, error } = await Promise.race([
+        fetchPromise,
+        timeoutPromise.then(() => {
+          throw new Error('Department fetch timed out');
+        })
+      ]);
+      
+      if (error) {
+        console.error('PERF DEBUG: Error fetching departments:', error);
+        throw error;
+      }
+      
+      if (!data || data.length === 0) {
+        console.warn('PERF DEBUG: No departments found in the database');
+        throw new Error('No departments found');
+      }
+      
+      console.log('PERF DEBUG: Successfully fetched departments at', new Date().toISOString());
+      
+      // Cache the departments in local storage
+      try {
+        localStorage.setItem('tsa_departments', JSON.stringify(data));
+        console.log('PERF DEBUG: Departments cached in local storage');
+      } catch (storageError) {
+        console.error('PERF DEBUG: Error storing departments in local storage:', storageError);
+      }
+      
+      setDepartments(data);
+      
+    } catch (error: any) {
+      console.error('PERF DEBUG: Error in fetchDepartments:', error);
+      
+      if (error.message === 'Department fetch timed out') {
+        notify.warning('Department loading is taking longer than expected', {
+          description: 'Using fallback department list for now'
+        });
+      } else {
+        notify.error('Could not load departments from the server', {
+          description: 'Using fallback department list instead'
+        });
+      }
+      
+      // Always use fallback departments in case of any error
+      const fallbackDepartments = [
+        { id: '1', name: 'CEO Office', department_code: 'CEO' },
+        { id: '2', name: 'Finance', department_code: 'FIN' },
+        { id: '3', name: 'Secretary', department_code: 'SEC' },
+        { id: '4', name: 'Business Management', department_code: 'BM' },
+        { id: '5', name: 'Audit', department_code: 'AUD' },
+        { id: '6', name: 'Welfare', department_code: 'WEL' },
+        { id: '7', name: 'Board Member', department_code: 'BMEM' }
+      ];
+      
+      setDepartments(fallbackDepartments);
+      console.log('PERF DEBUG: Using fallback departments after error');
+      
+      // Also cache these fallback departments for future use
+      try {
+        localStorage.setItem('tsa_departments', JSON.stringify(fallbackDepartments));
+      } catch (storageError) {
+        console.error('PERF DEBUG: Error storing fallback departments:', storageError);
+      }
+    } finally {
+      setIsDepartmentsLoading(false);
+    }
+  };
+
+  // Modified function to check for cached departments first before fetching
+  const loadDepartments = async () => {
+    console.log('PERF DEBUG: Loading departments');
+    
+    // First try to load from local storage
+    try {
+      const cachedDepartments = localStorage.getItem('tsa_departments');
+      if (cachedDepartments) {
+        const parsedDepartments = JSON.parse(cachedDepartments);
+        console.log('PERF DEBUG: Using cached departments from local storage');
+        setDepartments(parsedDepartments);
+        
+        // Fetch fresh departments in the background without blocking the UI
+        fetchDepartments().catch(error => {
+          console.error('PERF DEBUG: Background department refresh failed:', error);
+          // No need to notify user as we're already using cached data
+        });
+        return;
+      }
+    } catch (storageError) {
+      console.error('PERF DEBUG: Error reading cached departments:', storageError);
+    }
+    
+    // If no cached departments, fetch them directly
+    await fetchDepartments();
+  };
+
+  // Use the new loadDepartments function in useEffect
   useEffect(() => {
-    fetchDepartments();
+    loadDepartments();
   }, []);
 
   // Check password requirements whenever password changes
@@ -137,49 +264,6 @@ const SignupForm: React.FC = () => {
       setCompanyKey('');
     }
   }, [departmentId, departments]);
-
-  // Fetch departments function
-  const fetchDepartments = async () => {
-    setIsDepartmentsLoading(true);
-    
-    try {
-      console.log('Fetching departments from Supabase...');
-      const { data, error } = await supabase
-        .from('departments')
-        .select('id, name, department_code')
-        .order('name');
-      
-      if (error) {
-        console.error('Error fetching departments:', error);
-        notify.error('Failed to load departments. Please try again.');
-        return; // Return early without setting departments or changing loading state
-      }
-      
-      if (!data || data.length === 0) {
-        console.warn('No departments found in the database');
-        // Create fallback departments for testing if none exist
-        const fallbackDepartments = [
-          { id: '1', name: 'CEO Office', department_code: 'CEO' },
-          { id: '2', name: 'Finance', department_code: 'FIN' },
-          { id: '3', name: 'Secretary', department_code: 'SEC' },
-          { id: '4', name: 'Business Management', department_code: 'BM' },
-          { id: '5', name: 'Audit', department_code: 'AUD' },
-          { id: '6', name: 'Welfare', department_code: 'WEL' },
-          { id: '7', name: 'Board Member', department_code: 'BMEM' }
-        ];
-        setDepartments(fallbackDepartments);
-        console.log('Using fallback departments:', fallbackDepartments);
-      } else {
-        console.log('Successfully fetched departments:', data);
-        setDepartments(data);
-      }
-    } catch (error) {
-      console.error('Error in fetchDepartments:', error);
-      notify.error('An unexpected error occurred while loading departments');
-    } finally {
-      setIsDepartmentsLoading(false);
-    }
-  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -405,7 +489,7 @@ const SignupForm: React.FC = () => {
               value={firstName}
               onChange={(e) => setFirstName(e.target.value)}
                 className="block w-full pl-8 py-1.5 text-sm border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-                placeholder="John"
+                placeholder="Wisdom"
                 required
             />
           </div>
@@ -425,7 +509,7 @@ const SignupForm: React.FC = () => {
               value={lastName}
               onChange={(e) => setLastName(e.target.value)}
                 className="block w-full pl-8 py-1.5 text-sm border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-                placeholder="Doe"
+                placeholder="Gondwe"
                 required
             />
           </div>
