@@ -47,6 +47,7 @@ export default function Chat() {
   const [sending, setSending] = useState(false);
   const [replyingTo, setReplyingTo] = useState<Message | null>(null);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
+  const [userReady, setUserReady] = useState(false);
   
   // User color mapping
   const userColorMap = useRef(new Map<string, string>());
@@ -63,6 +64,17 @@ export default function Chat() {
     return userColorMap.current.get(userId) || "bg-primary";
   };
   
+  // Check if user is ready and properly authenticated
+  useEffect(() => {
+    if (user?.id) {
+      console.log("User authenticated:", user);
+      setUserReady(true);
+    } else {
+      console.log("User not ready:", user);
+      setUserReady(false);
+    }
+  }, [user]);
+  
   // Fetch messages on component mount and set up real-time subscriptions
   useEffect(() => {
     fetchMessages();
@@ -76,7 +88,7 @@ export default function Chat() {
       .subscribe();
 
     // Log user for debugging
-    console.log("Current user:", user);
+    console.log("Current user state:", user, "ID:", user?.id);
 
     return () => {
       messagesSubscription.unsubscribe();
@@ -193,28 +205,51 @@ export default function Chat() {
     setSending(true);
     try {
       // Log what we're trying to insert
-      console.log("Sending message:", {
-        content: messageText.trim(),
-        user_id: user?.id,
-        reply_to_id: replyingTo?.id || null,
-      });
+      console.log("Attempting to send message, user state:", user, "ID:", user?.id);
 
       // Make sure user ID is present
       if (!user?.id) {
-        throw new Error("User ID is missing. Please try logging out and back in.");
+        // Try to check if we can get the user from supabase directly
+        const { data: userData, error: userError } = await supabase.auth.getUser();
+        
+        if (userError || !userData?.user?.id) {
+          console.error("Failed to get user ID even from direct auth check:", userError);
+          toast({
+            title: 'Authentication Error',
+            description: 'Please log out and log back in to fix this issue.',
+            variant: 'destructive',
+          });
+          throw new Error("User ID is missing. Please try logging out and back in.");
+        }
+        
+        // We have a user ID from direct check
+        console.log("Found user ID via direct auth check:", userData.user.id);
+        
+        const { data, error } = await supabase.from('chat_messages').insert({
+          content: messageText.trim(),
+          user_id: userData.user.id,
+          reply_to_id: replyingTo?.id || null,
+        }).select();
+
+        if (error) {
+          throw error;
+        }
+
+        console.log("Message sent successfully with direct user ID:", data);
+      } else {
+        // Normal flow when user is available from context
+        const { data, error } = await supabase.from('chat_messages').insert({
+          content: messageText.trim(),
+          user_id: user.id,
+          reply_to_id: replyingTo?.id || null,
+        }).select();
+
+        if (error) {
+          throw error;
+        }
+
+        console.log("Message sent successfully with context user ID:", data);
       }
-
-      const { data, error } = await supabase.from('chat_messages').insert({
-        content: messageText.trim(),
-        user_id: user.id,
-        reply_to_id: replyingTo?.id || null,
-      }).select();
-
-      if (error) {
-        throw error;
-      }
-
-      console.log("Message sent successfully:", data);
 
       // Clear message text and reply state
       setMessageText('');
@@ -270,6 +305,13 @@ export default function Chat() {
     <div className="h-full flex flex-col">
       {/* The main chat content - exclude the header that's already in the dashboard layout */}
       <div className="flex-1 flex flex-col h-[calc(100vh-170px)] overflow-hidden">
+        {/* Auth Status Banner - show if user is not ready */}
+        {!userReady && (
+          <div className="bg-amber-100 dark:bg-amber-900/30 text-amber-800 dark:text-amber-200 text-sm p-2 text-center">
+            Checking authentication status... You may need to refresh if messages can't be sent.
+          </div>
+        )}
+        
         {/* Messages area - expanded to fill available space */}
         <ScrollArea className="flex-1 p-4" ref={scrollAreaRef}>
           {loading ? (
@@ -390,30 +432,31 @@ export default function Chat() {
                   id="message-input"
                   value={messageText}
                   onChange={(e) => setMessageText(e.target.value)}
-                  placeholder="Type a message..."
+                  placeholder={userReady ? "Type a message..." : "Authentication required..."}
                   className="min-h-[60px] max-h-[120px] resize-none pr-10 sm:min-h-[60px]"
                   onKeyDown={(e) => {
-                    if (e.key === 'Enter' && !e.shiftKey) {
+                    if (e.key === 'Enter' && !e.shiftKey && userReady) {
                       e.preventDefault();
                       handleSendMessage();
                     }
                   }}
+                  disabled={!userReady}
                 />
                 <div className="absolute bottom-2 right-2 flex items-center gap-1.5">
-                  <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-foreground">
+                  <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-foreground" disabled={!userReady}>
                     <Smile className="h-4 w-4" />
                   </Button>
-                  <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-foreground">
+                  <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-foreground" disabled={!userReady}>
                     <Paperclip className="h-4 w-4" />
                   </Button>
-                  <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-foreground">
+                  <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-foreground" disabled={!userReady}>
                     <Image className="h-4 w-4" />
                   </Button>
                 </div>
               </div>
               <Button 
                 onClick={handleSendMessage} 
-                disabled={sending}
+                disabled={sending || !userReady}
                 className="h-10 w-10 rounded-full"
               >
                 {sending ? (
