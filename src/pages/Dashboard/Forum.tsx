@@ -89,12 +89,12 @@ export default function Chat() {
         .from('chat_messages')
         .select(`
           *,
-          profile:profiles(id, first_name, last_name, email, avatar_url),
-          reply_to:chat_messages!chat_messages_reply_to_id_fkey(
+          profiles!chat_messages_user_id_fkey(id, first_name, last_name, email, avatar_url),
+          reply_to:chat_messages(
             id,
             content,
             user_id,
-            profile:profiles(id, first_name, last_name, email, avatar_url)
+            profiles!chat_messages_user_id_fkey(id, first_name, last_name, email, avatar_url)
           )
         `)
         .order('created_at', { ascending: true });
@@ -103,19 +103,21 @@ export default function Chat() {
         throw error;
       }
       
+      console.log("Messages data:", data);
+      
       // Process the data to match our Message interface
       const processedMessages = (data || []).map((msg: any) => {
         return {
           ...msg,
-          profile: msg.profile ? {
-            full_name: msg.profile.first_name + ' ' + (msg.profile.last_name || ''),
-            avatar_url: msg.profile.avatar_url
+          profile: msg.profiles ? {
+            full_name: msg.profiles.first_name + ' ' + (msg.profiles.last_name || ''),
+            avatar_url: msg.profiles.avatar_url
           } : undefined,
-          reply_to: msg.reply_to ? {
+          reply_to: msg.reply_to && msg.reply_to.length > 0 ? {
             ...msg.reply_to[0],
-            profile: msg.reply_to[0]?.profile ? {
-              full_name: msg.reply_to[0].profile.first_name + ' ' + (msg.reply_to[0].profile.last_name || ''),
-              avatar_url: msg.reply_to[0].profile.avatar_url
+            profile: msg.reply_to[0]?.profiles ? {
+              full_name: msg.reply_to[0].profiles.first_name + ' ' + (msg.reply_to[0].profiles.last_name || ''),
+              avatar_url: msg.reply_to[0].profiles.avatar_url
             } : undefined
           } : undefined
         };
