@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useRef, useMemo } from "react";
 import { Channel } from "@/pages/Dashboard/Forum";
 import { useAuth } from "@/components/auth/AuthContext";
@@ -6,7 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { Send, Loader2 } from "lucide-react";
+import { Send, Loader2, Reply, X } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { Avatar } from "@/components/ui/avatar";
 import { useToast } from "@/hooks/use-toast";
@@ -16,6 +15,16 @@ interface Message {
   content: string;
   created_at: string;
   user_id: string;
+  reply_to?: {
+    id: string;
+    content: string;
+    user_id: string;
+    profile?: {
+      first_name: string | null;
+      last_name: string | null;
+      email: string;
+    } | null;
+  };
   profile?: {
     first_name: string | null;
     last_name: string | null;
@@ -48,6 +57,7 @@ const ForumChannelView = ({ channel }: ForumChannelViewProps) => {
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
+  const [replyingTo, setReplyingTo] = useState<Message | null>(null);
   
   // Map to store user colors by user ID
   const userColorMap = useMemo(() => new Map<string, string>(), []);
@@ -168,7 +178,8 @@ const ForumChannelView = ({ channel }: ForumChannelViewProps) => {
           {
             content: messageText.trim(),
             user_id: user.id,
-            channel_id: channel.id
+            channel_id: channel.id,
+            reply_to_id: replyingTo?.id || null
           }
         ]);
 
@@ -182,8 +193,9 @@ const ForumChannelView = ({ channel }: ForumChannelViewProps) => {
         return;
       }
 
-      // Clear input after successful send
+      // Clear input and reply state after successful send
       setMessageText("");
+      setReplyingTo(null);
     } catch (error) {
       console.error('Error:', error);
     } finally {
@@ -228,6 +240,17 @@ const ForumChannelView = ({ channel }: ForumChannelViewProps) => {
     return user?.id === messageUserId;
   };
 
+  const handleReply = (message: Message) => {
+    setReplyingTo({
+      ...message,
+      created_at: message.created_at
+    });
+  };
+
+  const cancelReply = () => {
+    setReplyingTo(null);
+  };
+
   return (
     <div className="flex flex-col h-full">
       <div className="flex-shrink-0 p-4 border-b">
@@ -249,54 +272,79 @@ const ForumChannelView = ({ channel }: ForumChannelViewProps) => {
                 key={message.id} 
                 className={`flex ${isCurrentUser(message.user_id) ? 'justify-end' : 'justify-start'}`}
               >
-                <div className={`flex ${isCurrentUser(message.user_id) ? 'flex-row-reverse' : 'flex-row'} items-start gap-2 max-w-[80%]`}>
-                  <Avatar className="w-8 h-8 mt-1">
-                    <div className={`w-full h-full rounded-full ${isCurrentUser(message.user_id) ? 'bg-primary' : getUserColor(message.user_id)} flex items-center justify-center text-primary-foreground text-xs font-medium`}>
-                      {getInitials(message)}
+                <div className={`flex flex-col max-w-[80%] ${isCurrentUser(message.user_id) ? 'items-end' : 'items-start'}`}>
+                  {/* Reply preview if message is a reply */}
+                  {message.reply_to && (
+                    <div className="text-xs text-muted-foreground mb-1">
+                      Replying to {getUserName(message.reply_to)}
                     </div>
-                  </Avatar>
+                  )}
                   
-                  <div className={`rounded-lg px-3 py-2 ${
-                    isCurrentUser(message.user_id) 
-                      ? 'bg-primary text-primary-foreground' 
-                      : 'bg-muted'
-                  }`}>
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="font-medium text-xs">
-                        {isCurrentUser(message.user_id) ? 'You' : getUserName(message)}
-                      </span>
-                      <span className="text-xs opacity-70">
+                  <div className={`flex items-start gap-2 ${isCurrentUser(message.user_id) ? 'flex-row-reverse' : 'flex-row'}`}>
+                    <Avatar className={`h-8 w-8 ${getUserColor(message.user_id)} text-white flex items-center justify-center`}>
+                      {getInitials(message)}
+                    </Avatar>
+                    
+                    <div className={`group relative rounded-lg px-4 py-2 ${
+                      isCurrentUser(message.user_id) 
+                        ? 'bg-primary text-primary-foreground' 
+                        : 'bg-muted'
+                    }`}>
+                      <div className="text-sm">{message.content}</div>
+                      <div className="text-xs mt-1 opacity-70">
                         {formatMessageTime(message.created_at)}
-                      </span>
+                      </div>
+                      
+                      {/* Reply button - only show on hover */}
+                      <button
+                        onClick={() => handleReply(message)}
+                        className="absolute -top-2 -right-2 p-1 rounded-full bg-background border shadow-sm opacity-0 group-hover:opacity-100 transition-opacity"
+                      >
+                        <Reply className="h-4 w-4" />
+                      </button>
                     </div>
-                    <div className="whitespace-pre-wrap">{message.content}</div>
                   </div>
                 </div>
               </div>
             ))}
           </div>
         ) : (
-          <div className="flex items-center justify-center h-full">
-            <p className="text-muted-foreground">No messages yet. Be the first to send a message!</p>
+          <div className="flex justify-center items-center h-full text-muted-foreground">
+            No messages yet. Start the conversation!
           </div>
         )}
       </ScrollArea>
       
-      <div className="p-4 border-t mt-auto">
-        <div className="flex items-end gap-2">
+      {/* Reply preview */}
+      {replyingTo && (
+        <div className="flex items-center gap-2 p-2 bg-muted/50 border-t">
+          <div className="flex-1 text-sm text-muted-foreground">
+            Replying to {getUserName(replyingTo)}
+          </div>
+          <button
+            onClick={cancelReply}
+            className="p-1 hover:bg-muted rounded-full"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+      )}
+      
+      {/* Message input */}
+      <div className="flex-shrink-0 p-4 border-t">
+        <div className="flex gap-2">
           <Textarea
             value={messageText}
             onChange={(e) => setMessageText(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="Type your message here..."
-            className="resize-none min-h-[60px]"
-            disabled={sending}
+            placeholder={replyingTo ? `Reply to ${getUserName(replyingTo)}...` : "Type a message..."}
+            className="min-h-[60px] resize-none"
           />
           <Button 
             onClick={handleSendMessage} 
             disabled={!messageText.trim() || sending}
             size="icon"
-            className="shrink-0"
+            className="self-end"
           >
             {sending ? (
               <Loader2 className="h-4 w-4 animate-spin" />

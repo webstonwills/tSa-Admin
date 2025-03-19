@@ -23,7 +23,7 @@ export const notify = {
   success: (message: string, options?: EnhancedToastOptions) => {
     return sonnerToast.success(message, {
       icon: <CheckCircle className="h-5 w-5 text-green-500" />,
-      duration: 3000,
+      duration: 5000,
       className: "rounded-md border-green-200 shadow-md backdrop-blur-sm bg-white/95 dark:bg-gray-900/95",
       position: "top-center",
       ...options,
@@ -32,7 +32,7 @@ export const notify = {
   error: (message: string, options?: EnhancedToastOptions) => {
     return sonnerToast.error(message, {
       icon: <XCircle className="h-5 w-5 text-red-500" />,
-      duration: 4000,
+      duration: 6000,
       className: "rounded-md border-red-200 shadow-md backdrop-blur-sm bg-white/95 dark:bg-gray-900/95",
       position: "top-center",
       ...options,
@@ -41,7 +41,7 @@ export const notify = {
   warning: (message: string, options?: EnhancedToastOptions) => {
     return sonnerToast.warning(message, {
       icon: <AlertTriangle className="h-5 w-5 text-amber-500" />,
-      duration: 4000,
+      duration: 6000,
       className: "rounded-md border-amber-200 shadow-md backdrop-blur-sm bg-white/95 dark:bg-gray-900/95",
       position: "top-center",
       ...options,
@@ -50,7 +50,7 @@ export const notify = {
   info: (message: string, options?: EnhancedToastOptions) => {
     return sonnerToast.info(message, {
       icon: <Info className="h-5 w-5 text-blue-500" />,
-      duration: 3000,
+      duration: 5000,
       className: "rounded-md border-blue-200 shadow-md backdrop-blur-sm bg-white/95 dark:bg-gray-900/95",
       position: "top-center",
       ...options,
@@ -60,8 +60,8 @@ export const notify = {
   authSuccess: (message: string, options?: EnhancedToastOptions) => {
     return sonnerToast.success(message, {
       icon: <CheckCircle className="h-5 w-5 text-green-500" />,
-      duration: 3000, 
-      description: "Welcome back! You're now signed in.",
+      duration: 5000,
+      description: "You're now signed in. Redirecting...",
       className: "rounded-md border-green-200 shadow-md backdrop-blur-sm bg-white/95 dark:bg-gray-900/95",
       position: "top-center",
       ...options,
@@ -70,7 +70,7 @@ export const notify = {
   authError: (message: string, options?: EnhancedToastOptions) => {
     return sonnerToast.error(message, {
       icon: <XCircle className="h-5 w-5 text-red-500" />,
-      duration: 4000,
+      duration: 6000,
       description: "There was a problem with your authentication.",
       className: "rounded-md border-red-200 shadow-md backdrop-blur-sm bg-white/95 dark:bg-gray-900/95",
       position: "top-center",

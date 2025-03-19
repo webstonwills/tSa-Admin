@@ -172,144 +172,28 @@ const LoginForm: React.FC = () => {
     }
   };
 
+  // Add comment above useEffect that handles loginSuccess
+  // This useEffect handles navigation after successful login as a fallback mechanism
+  // It should rarely be triggered with the direct navigation approach implemented in handleSubmit
   useEffect(() => {
-    if (!loginSuccess || !user) return;
-
-    const handleSuccessfulLogin = async () => {
-      try {
-        console.log("LOGIN DEBUG: User authenticated, user ID:", user.id, "email:", user.email);
-        
-        // Clear login state immediately to prevent repeated processing
-        setLoginSuccess(false);
-        
-        // Get user role directly from auth
-        const { data: authUser } = await supabase.auth.getUser();
-        const userMetadata = authUser?.user?.user_metadata || {};
-        
-        console.log("LOGIN DEBUG: Auth metadata:", userMetadata);
-        
-        const metadataRole = userMetadata.role || '';
-        const metadataApprovalStatus = userMetadata.approval_status || APPROVAL_STATUS.PENDING;
-        const isCEO = (userMetadata.role === 'ceo') || 
-                      (userMetadata.department_code === 'CEO');
-        
-        console.log("LOGIN DEBUG: User details from metadata - Role:", metadataRole, "Approval:", metadataApprovalStatus, "Is CEO:", isCEO);
-        
-        // For CEO users, always go to the CEO dashboard immediately
-        if (isCEO) {
-          console.log("LOGIN DEBUG: CEO role confirmed - navigating to CEO dashboard");
-          navigate(APP_CONFIG.DASHBOARDS.CEO, { replace: true });
-          notify.success('Welcome back, CEO!');
-          return;
-        }
-        
-        // For non-CEO users, we need to check the actual approval status in the database
-        // because the metadata might be out of sync with the database
-        console.log("LOGIN DEBUG: Fetching actual approval status from database");
-        
-        try {
-          // Get the true approval status from the profiles table
-          const { data: profileData, error: profileError } = await supabase
-            .from('profiles')
-            .select('*')
-            .eq('id', user.id)
-            .single();
-            
-          if (profileError) {
-            throw profileError;
-          }
-          
-          console.log("LOGIN DEBUG: Database profile data:", profileData);
-          
-          // Use the database approval status, which is more authoritative than metadata
-          const dbApprovalStatus = profileData.approval_status;
-          const dbRole = profileData.role;
-          const dbDepartmentId = profileData.department_id;
-          
-          console.log("LOGIN DEBUG: Database status - Approval:", dbApprovalStatus, "Role:", dbRole, "Department:", dbDepartmentId);
-          
-          // Check approval status from the database
-          if (dbApprovalStatus === 'approved') {
-            console.log("LOGIN DEBUG: User is APPROVED in database");
-            
-            // User is approved - redirect based on role
-            if (dbRole === 'secretary') {
-              console.log("LOGIN DEBUG: Secretary role detected - navigating to secretary dashboard");
-              navigate(APP_CONFIG.DASHBOARDS.SECRETARY, { replace: true });
-              return;
-            } else if (dbRole === 'finance') {
-              console.log("LOGIN DEBUG: Finance role detected - navigating to finance dashboard");
-              navigate(APP_CONFIG.DASHBOARDS.FINANCE, { replace: true });
-              return;
-            } else if (dbRole === 'business_management') {
-              console.log("LOGIN DEBUG: Business management role detected - navigating to BM dashboard");
-              navigate(APP_CONFIG.DASHBOARDS.BUSINESS_MANAGEMENT, { replace: true });
-              return;
-            } else if (dbRole === 'auditor') {
-              console.log("LOGIN DEBUG: Auditor role detected - navigating to auditor dashboard");
-              navigate(APP_CONFIG.DASHBOARDS.AUDITOR, { replace: true });
-              return;
-            } else if (dbRole === 'welfare') {
-              console.log("LOGIN DEBUG: Welfare role detected - navigating to welfare dashboard");
-              navigate(APP_CONFIG.DASHBOARDS.WELFARE, { replace: true });
-              return;
-            } else if (dbRole === 'board_member') {
-              console.log("LOGIN DEBUG: Board member role detected - navigating to board member dashboard");
-              navigate(APP_CONFIG.DASHBOARDS.BOARD_MEMBER, { replace: true });
-              return;
-            } else if (dbDepartmentId) {
-              console.log(`LOGIN DEBUG: User has department ID ${dbDepartmentId} - directing to department dashboard`);
-              navigate(`/dashboard/department/${dbDepartmentId}`, { replace: true });
-              return;
-            } else {
-              // If no specific role but still approved, go to default dashboard
-              console.log("LOGIN DEBUG: Approved user with no specific role - using default dashboard");
-              navigate(APP_CONFIG.DASHBOARDS.DEFAULT, { replace: true });
-              return;
-            }
-          } else if (dbApprovalStatus === 'rejected') {
-            console.log('LOGIN DEBUG: User account was rejected - redirecting to rejected page');
-            navigate('/auth/rejected-approval', { replace: true });
-            return;
-          } else {
-            // User is pending approval
-            console.log('LOGIN DEBUG: User account requires approval - redirecting to pending page');
-            navigate('/auth/pending-approval', { replace: true });
-            notify.info('Your account is pending approval by an administrator');
-            return;
-          }
-        } catch (profileError) {
-          console.error("LOGIN DEBUG: Error fetching profile from database:", profileError);
-          
-          // Fallback to metadata if database check fails
-          if (metadataApprovalStatus === APPROVAL_STATUS.PENDING) {
-            console.log('LOGIN DEBUG: Fallback to metadata: User account requires approval');
-            navigate('/auth/pending-approval', { replace: true });
-            notify.info('Your account is pending approval by an administrator');
-            return;
-          }
-          
-          if (metadataApprovalStatus === APPROVAL_STATUS.REJECTED) {
-            console.log('LOGIN DEBUG: Fallback to metadata: User account was rejected');
-            navigate('/auth/rejected-approval', { replace: true });
-            return;
-          }
-        }
-        
-        // Final fallback to handleNavigation for any cases not specifically handled above
-        console.log("LOGIN DEBUG: Calling handleNavigation as fallback");
-        handleNavigation();
-      } catch (error) {
-        console.error("LOGIN DEBUG: Error in login sequence:", error);
-        notify.error('Login problem detected', {
-          description: 'Redirecting you to the pending approval page'
-        });
-        navigate('/auth/pending-approval', { replace: true });
+    if (loginSuccess) {
+      console.log('LOGIN DEBUG: useEffect navigation triggered');
+      // Clear the login in progress flag
+      localStorage.removeItem('tsa_login_in_progress');
+      
+      // Get cached role info
+      const cachedRole = localStorage.getItem('tsa_user_role');
+      
+      if (cachedRole === 'ceo') {
+        console.log('LOGIN DEBUG: useEffect - CEO role detected');
+        navigate(APP_CONFIG.DASHBOARDS.CEO, { replace: true });
+      } else {
+        // For all other roles, we use the profile page logic
+        console.log('LOGIN DEBUG: useEffect - Default navigation to profile');
+        navigate('/profile', { replace: true });
       }
-    };
-
-    handleSuccessfulLogin();
-  }, [loginSuccess, user, navigate, handleNavigation]);
+    }
+  }, [loginSuccess, navigate]);
 
   // Enhanced version of handleSubmit that handles login more efficiently
   const handleSubmit = async (e: React.FormEvent) => {
@@ -365,59 +249,35 @@ const LoginForm: React.FC = () => {
       // For CEO users, directly navigate to dashboard without waiting for profile
       if (isCEO) {
         console.log('LOGIN DEBUG: CEO user detected, redirecting directly to CEO dashboard');
-        setIsLoading(false);
         
-        try {
-          // Fix for hash router - ensure we use the correct route format
-          const baseUrl = window.location.origin;
-          // Find the router pattern - either hash or regular routes
-          const isHashRouter = window.location.href.includes('/#/');
-          
-          // Construct the URL with the appropriate pattern
-          let dashboardUrl;
-          if (isHashRouter) {
-            // For hash router pattern
-            dashboardUrl = `${baseUrl}/#/dashboard/ceo`;
-          } else {
-            // For browser router pattern, or fallback if we can't detect
-            dashboardUrl = `${baseUrl}/#/dashboard/ceo`;
-          }
-          
-          console.log('LOGIN DEBUG: Redirecting CEO to URL:', dashboardUrl);
-          
-          // Force a clean navigation state by first removing any login flags
-          localStorage.removeItem('tsa_login_in_progress');
-          
-          // In case there's any async issues, set a flag indicating CEO login
-          localStorage.setItem('tsa_ceo_redirect', 'true');
-          
-          // Use immediate navigation to avoid React rendering cycles
-          window.location.href = dashboardUrl;
-        } catch (error) {
-          console.error('LOGIN DEBUG: Error during CEO redirect:', error);
-          // Fallback to navigate API if direct redirect fails
+        // Set a short timeout to ensure notification is visible before navigation
+        setTimeout(() => {
+          setIsLoading(false);
           navigate(APP_CONFIG.DASHBOARDS.CEO, { replace: true });
-        }
+        }, 800);
+        
         return;
       }
-
+      
       // For non-CEO users, we need to check if they have a department and role in the database
       // before setting the login success
       try {
         // Get user profile from database to check approval status directly
-        const { data: profileData, error: profileError } = await supabase
-          .from('profiles')
+      const { data: profileData, error: profileError } = await supabase
+        .from('profiles')
           .select('*')
-          .eq('id', data.user.id)
-          .single();
-        
-        if (profileError) {
+        .eq('id', data.user.id)
+        .single();
+      
+      if (profileError) {
           console.error('LOGIN DEBUG: Error fetching profile:', profileError);
-          setLoginSuccess(true); // Fall back to useEffect navigation
-          setIsLoading(false);
-          return;
-        }
-        
+          setTimeout(() => {
+            setLoginSuccess(true); // Fall back to useEffect navigation
+        setIsLoading(false);
+          }, 800);
+        return;
+      }
+
         console.log('LOGIN DEBUG: Profile data from DB:', profileData);
         
         const dbRole = profileData.role;
@@ -433,47 +293,62 @@ const LoginForm: React.FC = () => {
           // Direct navigation based on role
           const roleLower = dbRole.toLowerCase();
           
-          if (roleLower === 'secretary') {
-            console.log('LOGIN DEBUG: Secretary role detected, redirecting');
+          setTimeout(() => {
             setIsLoading(false);
-            navigate(APP_CONFIG.DASHBOARDS.SECRETARY, { replace: true });
-            return;
-          } else if (roleLower === 'finance') {
-            console.log('LOGIN DEBUG: Finance role detected, redirecting');
+            
+            if (roleLower === 'secretary') {
+              console.log('LOGIN DEBUG: Secretary role detected, redirecting');
+              navigate(APP_CONFIG.DASHBOARDS.SECRETARY, { replace: true });
+            } else if (roleLower === 'finance') {
+              console.log('LOGIN DEBUG: Finance role detected, redirecting');
+              navigate(APP_CONFIG.DASHBOARDS.FINANCE, { replace: true });
+            } else if (roleLower === 'business_management') {
+              console.log('LOGIN DEBUG: Business Management role detected, redirecting');
+              navigate(APP_CONFIG.DASHBOARDS.BUSINESS_MANAGEMENT, { replace: true });
+            } else if (roleLower === 'auditor') {
+              console.log('LOGIN DEBUG: Auditor role detected, redirecting');
+              navigate(APP_CONFIG.DASHBOARDS.AUDITOR, { replace: true });
+            } else if (roleLower === 'welfare') {
+              console.log('LOGIN DEBUG: Welfare role detected, redirecting');
+              navigate(APP_CONFIG.DASHBOARDS.WELFARE, { replace: true });
+            } else if (roleLower === 'board_member') {
+              console.log('LOGIN DEBUG: Board Member role detected, redirecting');
+              navigate(APP_CONFIG.DASHBOARDS.BOARD_MEMBER, { replace: true });
+            } else if (dbDepartmentId) {
+              console.log(`LOGIN DEBUG: User has department ID ${dbDepartmentId}, redirecting`);
+              navigate(`/dashboard/department/${dbDepartmentId}`, { replace: true });
+            } else {
+              navigate(APP_CONFIG.DASHBOARDS.DEFAULT, { replace: true });
+            }
+          }, 800);
+          
+          return;
+        } else if (dbApprovalStatus === 'pending') {
+          setTimeout(() => {
             setIsLoading(false);
-            navigate(APP_CONFIG.DASHBOARDS.FINANCE, { replace: true });
-            return;
-          } else if (roleLower === 'business_management') {
-            console.log('LOGIN DEBUG: Business Management role detected, redirecting');
-            setIsLoading(false);
-            navigate(APP_CONFIG.DASHBOARDS.BUSINESS_MANAGEMENT, { replace: true });
-            return;
-          } else if (roleLower === 'auditor') {
-            console.log('LOGIN DEBUG: Auditor role detected, redirecting');
-            setIsLoading(false);
-            navigate(APP_CONFIG.DASHBOARDS.AUDITOR, { replace: true });
-            return;
-          } else if (roleLower === 'welfare') {
-            console.log('LOGIN DEBUG: Welfare role detected, redirecting');
-            setIsLoading(false);
-            navigate(APP_CONFIG.DASHBOARDS.WELFARE, { replace: true });
-            return;
-          } else if (roleLower === 'board_member') {
-            console.log('LOGIN DEBUG: Board Member role detected, redirecting');
-            setIsLoading(false);
-            navigate(APP_CONFIG.DASHBOARDS.BOARD_MEMBER, { replace: true });
+            navigate('/auth/pending-approval', { replace: true });
+          }, 800);
+          return;
+        } else if (dbApprovalStatus === 'rejected') {
+          setTimeout(() => {
+          setIsLoading(false);
+            navigate('/auth/rejected-approval', { replace: true });
+          }, 800);
           return;
         }
-      }
-
+        
         // If we get here, use the standard login flow
-        setLoginSuccess(true);
-        setIsLoading(false);
-    } catch (error) {
+        setTimeout(() => {
+          setLoginSuccess(true);
+          setIsLoading(false);
+        }, 800);
+      } catch (error) {
         console.error('LOGIN DEBUG: Error in direct navigation check:', error);
         // Fall back to useEffect navigation
-        setLoginSuccess(true);
-        setIsLoading(false);
+        setTimeout(() => {
+          setLoginSuccess(true);
+          setIsLoading(false);
+        }, 800);
       }
     } catch (error: any) {
       console.error('LOGIN DEBUG: Unexpected error during login:', error);

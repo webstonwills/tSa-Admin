@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import ForumChannelList from "@/components/forum/ForumChannelList";
@@ -119,42 +118,41 @@ const Forum = () => {
 
   return (
     <DashboardLayout>
-      <div className="space-y-4">
-        <div className="flex justify-between items-center">
+      <div className="h-[calc(100vh-4rem)] flex flex-col">
+        <div className="flex justify-between items-center p-4 border-b">
           <h1 className="text-2xl font-bold">Organization Forum</h1>
           {isCEO && <NewChannelDialog onCreateChannel={handleChannelCreate} />}
         </div>
         
         {loading ? (
-          <div className="flex justify-center p-8">
+          <div className="flex-1 flex justify-center items-center">
             <Loader2 className="h-8 w-8 animate-spin text-primary" />
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <div className="md:col-span-1">
-              <Card className="h-[calc(100vh-220px)] overflow-hidden flex flex-col">
-                <ForumChannelList 
-                  channels={channels} 
-                  selectedChannel={selectedChannel} 
-                  onSelectChannel={setSelectedChannel} 
-                />
-              </Card>
+          <div className="flex-1 flex overflow-hidden">
+            {/* Channels List - Fixed width on desktop, full width on mobile */}
+            <div className="w-full md:w-80 border-r flex-shrink-0">
+              <ForumChannelList 
+                channels={channels} 
+                selectedChannel={selectedChannel} 
+                onSelectChannel={setSelectedChannel} 
+              />
             </div>
-            <div className="md:col-span-3">
-              <Card className="h-[calc(100vh-220px)] overflow-hidden flex flex-col">
-                {selectedChannel ? (
-                  <ForumChannelView channel={selectedChannel} />
-                ) : (
-                  <div className="flex-1 flex items-center justify-center p-6 text-center text-muted-foreground">
-                    {channels.length > 0 ? 
-                      "Select a channel to start chatting" : 
-                      isCEO ? 
-                        "No channels available. Create a new channel to get started." :
-                        "No channels available. Only the CEO can create new channels."
-                    }
-                  </div>
-                )}
-              </Card>
+            
+            {/* Chat View - Takes remaining space */}
+            <div className="flex-1 flex flex-col">
+              {selectedChannel ? (
+                <ForumChannelView channel={selectedChannel} />
+              ) : (
+                <div className="flex-1 flex items-center justify-center p-6 text-center text-muted-foreground">
+                  {channels.length > 0 ? 
+                    "Select a channel to start chatting" : 
+                    isCEO ? 
+                      "No channels available. Create a new channel to get started." :
+                      "No channels available. Only the CEO can create new channels."
+                  }
+                </div>
+              )}
             </div>
           </div>
         )}
