@@ -228,6 +228,43 @@ export type Database = {
           },
         ]
       }
+      chat_messages: {
+        Row: {
+          id: string
+          content: string
+          user_id: string
+          created_at: string
+          reply_to_id: string | null
+        }
+        Insert: {
+          id?: string
+          content: string
+          user_id: string
+          created_at?: string
+          reply_to_id?: string | null
+        }
+        Update: {
+          id?: string
+          content?: string
+          user_id?: string
+          created_at?: string
+          reply_to_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "chat_messages_user_id_fkey"
+            columns: ["user_id"]
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "chat_messages_reply_to_id_fkey"
+            columns: ["reply_to_id"]
+            referencedRelation: "chat_messages"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
     }
     Views: {
       [_ in never]: never

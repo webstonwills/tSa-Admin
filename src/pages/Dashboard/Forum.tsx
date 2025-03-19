@@ -2,13 +2,13 @@ import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useToast } from '@/components/ui/use-toast';
 import { formatDistanceToNow } from 'date-fns';
-import { Loader2, Send, Reply, X } from 'lucide-react';
+import { Loader2, Send, Reply, X, Image, Smile, Paperclip, Mic } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 // Define interfaces for our data structures
 interface Message {
@@ -21,15 +21,7 @@ interface Message {
     full_name: string;
     avatar_url: string;
   };
-  reply_to?: {
-    id: string;
-    content: string;
-    user_id: string;
-    profile?: {
-      full_name: string;
-      avatar_url: string;
-    };
-  };
+  reply_to?: Message;
 }
 
 // Array of colors for user avatars
@@ -93,29 +85,51 @@ export default function Chat() {
     try {
       setLoading(true);
       
-      const { data: messagesData, error: messagesError } = await supabase
+      const { data, error } = await supabase
         .from('chat_messages')
         .select(`
           *,
-          profile:profiles(full_name, avatar_url),
-          reply_to:chat_messages(
+          profile:profiles(id, first_name, last_name, email, avatar_url),
+          reply_to:chat_messages!chat_messages_reply_to_id_fkey(
             id,
             content,
             user_id,
-            profile:profiles(full_name, avatar_url)
+            profile:profiles(id, first_name, last_name, email, avatar_url)
           )
         `)
         .order('created_at', { ascending: true });
 
-      if (messagesError) throw messagesError;
+      if (error) {
+        throw error;
+      }
       
-      setMessages(messagesData || []);
+      // Process the data to match our Message interface
+      const processedMessages = (data || []).map((msg: any) => {
+        return {
+          ...msg,
+          profile: msg.profile ? {
+            full_name: msg.profile.first_name + ' ' + (msg.profile.last_name || ''),
+            avatar_url: msg.profile.avatar_url
+          } : undefined,
+          reply_to: msg.reply_to ? {
+            ...msg.reply_to[0],
+            profile: msg.reply_to[0]?.profile ? {
+              full_name: msg.reply_to[0].profile.first_name + ' ' + (msg.reply_to[0].profile.last_name || ''),
+              avatar_url: msg.reply_to[0].profile.avatar_url
+            } : undefined
+          } : undefined
+        };
+      });
+      
+      setMessages(processedMessages);
+      
+      // Scroll to bottom after messages load
       setTimeout(() => scrollToBottom(), 100);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error fetching messages:', error);
       toast({
         title: 'Error',
-        description: 'Failed to load chat messages',
+        description: error.message || 'Failed to load chat messages',
         variant: 'destructive',
       });
     } finally {
@@ -141,24 +155,22 @@ export default function Chat() {
 
     setSending(true);
     try {
-      const { error } = await supabase.from('chat_messages').insert([
-        {
-          content: messageText.trim(),
-          user_id: user.id,
-          reply_to_id: replyingTo?.id || null,
-        },
-      ]);
+      const { error } = await supabase.from('chat_messages').insert({
+        content: messageText.trim(),
+        user_id: user.id,
+        reply_to_id: replyingTo?.id || null,
+      });
 
       if (error) throw error;
 
       setMessageText('');
       setReplyingTo(null);
-      setTimeout(() => scrollToBottom(), 100);
-    } catch (error) {
+      fetchMessages(); // Fetch messages to ensure we get the latest
+    } catch (error: any) {
       console.error('Error sending message:', error);
       toast({
         title: 'Error',
-        description: 'Failed to send message',
+        description: error.message || 'Failed to send message',
         variant: 'destructive',
       });
     } finally {
@@ -203,22 +215,40 @@ export default function Chat() {
   };
 
   return (
-    <div className="container mx-auto px-3 py-4 max-w-3xl h-[calc(100vh-120px)]">
-      <div className="flex flex-col h-full border rounded-lg shadow-sm overflow-hidden">
-        {/* Header */}
+    <div className="container mx-auto py-4 max-w-4xl">
+      <div className="flex flex-col h-[calc(100vh-200px)] border rounded-xl shadow-md overflow-hidden bg-background">
+        {/* Header - Always visible */}
         <div className="flex-shrink-0 p-4 border-b bg-card">
-          <h1 className="text-xl font-bold">Chat</h1>
-          <p className="text-sm text-muted-foreground">Group chat with all members</p>
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-xl font-bold text-primary">Team Chat</h1>
+              <p className="text-sm text-muted-foreground">
+                Connect with all team members in real-time
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="inline-flex h-3 w-3 rounded-full bg-green-500"></span>
+              <span className="text-sm font-medium text-muted-foreground">
+                {messages.length > 0 ? `${messages.length} messages` : 'No messages yet'}
+              </span>
+            </div>
+          </div>
         </div>
         
         {/* Messages */}
-        <ScrollArea className="flex-1 p-4" ref={scrollAreaRef}>
+        <ScrollArea 
+          className="flex-1 px-4 py-6 bg-gradient-to-b from-background to-muted/20" 
+          ref={scrollAreaRef}
+        >
           {loading ? (
-            <div className="flex justify-center p-8">
-              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            <div className="flex justify-center items-center h-full">
+              <div className="flex flex-col items-center gap-2">
+                <Loader2 className="h-10 w-10 animate-spin text-primary" />
+                <p className="text-sm text-muted-foreground">Loading messages...</p>
+              </div>
             </div>
           ) : messages.length > 0 ? (
-            <div className="space-y-4">
+            <div className="space-y-6">
               {messages.map((message) => (
                 <div 
                   key={message.id} 
@@ -228,23 +258,23 @@ export default function Chat() {
                     {/* Reply preview */}
                     {message.reply_to && (
                       <div 
-                        className={`text-xs px-2 py-1 rounded-t-md ${
+                        className={`text-xs mb-1 px-3 py-1.5 rounded-t-lg ${
                           isCurrentUser(message.user_id) 
-                            ? 'bg-primary/20 text-primary-foreground/80' 
-                            : 'bg-muted/70 text-muted-foreground'
+                            ? 'bg-primary/15 text-primary-foreground/90 rounded-tl-lg rounded-tr-none' 
+                            : 'bg-muted/80 text-foreground/80 rounded-tr-lg rounded-tl-none'
                         }`}
                       >
                         <span className="font-medium">
                           {message.reply_to.profile?.full_name || 'Unknown user'}:
-                        </span> {message.reply_to.content.length > 40 
-                          ? `${message.reply_to.content.substring(0, 40)}...` 
+                        </span> {message.reply_to.content.length > 60 
+                          ? `${message.reply_to.content.substring(0, 60)}...` 
                           : message.reply_to.content}
                       </div>
                     )}
                     
                     <div className={`flex items-start gap-2 ${isCurrentUser(message.user_id) ? 'flex-row-reverse' : 'flex-row'}`}>
                       {!isCurrentUser(message.user_id) && (
-                        <Avatar className={`h-8 w-8 ${getUserColor(message.user_id)} text-white flex-shrink-0`}>
+                        <Avatar className={`h-9 w-9 ${getUserColor(message.user_id)} text-white flex-shrink-0 ring-2 ring-background shadow-sm`}>
                           <AvatarFallback>{getInitials(message)}</AvatarFallback>
                           <AvatarImage src={message.profile?.avatar_url} />
                         </Avatar>
@@ -257,22 +287,25 @@ export default function Chat() {
                           </div>
                         )}
                         
-                        <div className={`relative rounded-lg px-3 py-2 ${
+                        <div className={cn(
+                          "relative rounded-lg px-4 py-2.5 shadow-sm",
                           isCurrentUser(message.user_id) 
-                            ? 'bg-primary text-primary-foreground rounded-tr-none' 
-                            : 'bg-muted rounded-tl-none'
-                        }`}>
-                          <div className="text-sm whitespace-pre-wrap break-words">{message.content}</div>
-                          <div className="text-xs mt-1 opacity-70">
+                            ? "bg-primary text-primary-foreground rounded-tr-none" 
+                            : "bg-card border rounded-tl-none"
+                        )}>
+                          <div className="text-sm whitespace-pre-wrap break-words leading-relaxed">
+                            {message.content}
+                          </div>
+                          <div className="text-xs mt-1.5 opacity-70 font-medium">
                             {formatDistanceToNow(new Date(message.created_at), { addSuffix: true })}
                           </div>
                           
                           {/* Reply button */}
                           <button
                             onClick={() => handleReply(message)}
-                            className="absolute -top-2 -right-2 p-1 rounded-full bg-background border shadow-sm opacity-0 group-hover:opacity-100 transition-opacity"
+                            className="absolute -top-2 -right-2 p-1.5 rounded-full bg-background border shadow-sm opacity-0 group-hover:opacity-100 transition-opacity hover:bg-muted"
                           >
-                            <Reply className="h-4 w-4" />
+                            <Reply className="h-3.5 w-3.5" />
                           </button>
                         </div>
                       </div>
@@ -282,21 +315,28 @@ export default function Chat() {
               ))}
             </div>
           ) : (
-            <div className="flex justify-center items-center h-full text-muted-foreground">
-              No messages yet. Start the conversation!
+            <div className="flex flex-col justify-center items-center h-full gap-3 text-muted-foreground">
+              <div className="h-16 w-16 rounded-full bg-primary/10 flex items-center justify-center">
+                <Send className="h-8 w-8 text-primary/60" />
+              </div>
+              <p className="text-lg font-medium">No messages yet</p>
+              <p className="text-sm">Be the first to start the conversation!</p>
             </div>
           )}
         </ScrollArea>
         
         {/* Reply preview */}
         {replyingTo && (
-          <div className="flex items-center gap-2 p-2 bg-muted/30 border-t">
-            <div className="flex-1 text-sm text-muted-foreground">
-              <span className="font-medium">
-                Replying to {replyingTo.profile?.full_name || 'Unknown user'}:
-              </span> {replyingTo.content.length > 40 
-                ? `${replyingTo.content.substring(0, 40)}...` 
-                : replyingTo.content}
+          <div className="flex items-center gap-2 p-3 bg-muted/30 border-t border-b">
+            <div className="flex-1 flex items-center gap-2">
+              <Reply className="h-4 w-4 text-muted-foreground" />
+              <div className="text-sm text-muted-foreground">
+                <span className="font-medium">
+                  Replying to {replyingTo.profile?.full_name || 'Unknown user'}:
+                </span> {replyingTo.content.length > 50 
+                  ? `${replyingTo.content.substring(0, 50)}...` 
+                  : replyingTo.content}
+              </div>
             </div>
             <button
               onClick={cancelReply}
@@ -309,27 +349,65 @@ export default function Chat() {
         
         {/* Message input */}
         <div className="flex-shrink-0 p-4 border-t bg-card">
-          <div className="flex gap-2">
-            <Textarea
-              id="message-input"
-              value={messageText}
-              onChange={(e) => setMessageText(e.target.value)}
-              onKeyDown={handleKeyDown}
-              placeholder={replyingTo ? `Reply to ${replyingTo.profile?.full_name || 'Unknown user'}...` : "Type a message..."}
-              className="min-h-[60px] resize-none"
-            />
-            <Button 
-              onClick={handleSendMessage} 
-              disabled={!messageText.trim() || sending}
-              size="icon"
-              className="self-end h-10 w-10"
-            >
-              {sending ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <Send className="h-4 w-4" />
-              )}
-            </Button>
+          <div className="flex flex-col gap-3">
+            <div className="flex gap-2 items-end">
+              <div className="flex-1 relative">
+                <Textarea
+                  id="message-input"
+                  value={messageText}
+                  onChange={(e) => setMessageText(e.target.value)}
+                  onKeyDown={handleKeyDown}
+                  placeholder={replyingTo ? `Reply to ${replyingTo.profile?.full_name || 'Unknown user'}...` : "Type a message..."}
+                  className="min-h-[60px] resize-none pr-24 text-base"
+                />
+                <div className="absolute right-3 bottom-3 flex items-center gap-1.5">
+                  <Button 
+                    variant="ghost" 
+                    size="icon" 
+                    className="h-8 w-8 rounded-full opacity-70 hover:opacity-100"
+                    type="button"
+                  >
+                    <Smile className="h-5 w-5" />
+                  </Button>
+                  <Button 
+                    variant="ghost" 
+                    size="icon" 
+                    className="h-8 w-8 rounded-full opacity-70 hover:opacity-100"
+                    type="button"
+                  >
+                    <Paperclip className="h-5 w-5" />
+                  </Button>
+                </div>
+              </div>
+              <Button 
+                onClick={handleSendMessage} 
+                disabled={!messageText.trim() || sending}
+                size="icon"
+                className="h-10 w-10 rounded-full shadow-sm"
+                type="submit"
+              >
+                {sending ? (
+                  <Loader2 className="h-5 w-5 animate-spin" />
+                ) : (
+                  <Send className="h-5 w-5" />
+                )}
+              </Button>
+            </div>
+            <div className="flex justify-between items-center">
+              <p className="text-xs text-muted-foreground">
+                Press Enter to send, Shift+Enter for new line
+              </p>
+              <div className="flex gap-2">
+                <Button variant="ghost" size="sm" className="h-7 px-2 text-xs">
+                  <Image className="h-3.5 w-3.5 mr-1" />
+                  Image
+                </Button>
+                <Button variant="ghost" size="sm" className="h-7 px-2 text-xs">
+                  <Mic className="h-3.5 w-3.5 mr-1" />
+                  Voice
+                </Button>
+              </div>
+            </div>
           </div>
         </div>
       </div>
