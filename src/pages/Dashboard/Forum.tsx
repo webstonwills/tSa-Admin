@@ -1,101 +1,121 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { Card } from '@/components/ui/card';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useToast } from '@/components/ui/use-toast';
 import { formatDistanceToNow } from 'date-fns';
-import { Loader2, Send, ThumbsUp, MessageCircle, MoreVertical, Flag, PlusCircle, X } from 'lucide-react';
+import { Loader2, Send, Reply, X } from 'lucide-react';
 
 // Define interfaces for our data structures
-interface Post {
-  id: string;
-  title: string;
-  content: string;
-  created_at: string;
-  user_id: string;
-  user: {
-    full_name: string;
-    avatar_url: string;
-  };
-  likes: number;
-  comments: Comment[];
-}
-
-interface Comment {
+interface Message {
   id: string;
   content: string;
   created_at: string;
   user_id: string;
-  post_id: string;
-  user: {
+  reply_to_id: string | null;
+  profile?: {
     full_name: string;
     avatar_url: string;
   };
+  reply_to?: {
+    id: string;
+    content: string;
+    user_id: string;
+    profile?: {
+      full_name: string;
+      avatar_url: string;
+    };
+  };
 }
 
-export default function Forum() {
+// Array of colors for user avatars
+const userColors = [
+  "bg-blue-600",
+  "bg-green-600", 
+  "bg-purple-600",
+  "bg-pink-600",
+  "bg-amber-600",
+  "bg-indigo-600",
+  "bg-emerald-600",
+  "bg-rose-600",
+  "bg-teal-600",
+];
+
+export default function Chat() {
   // State variables
   const { user } = useAuth();
   const { toast } = useToast();
-  const [posts, setPosts] = useState<Post[]>([]);
-  const [newPost, setNewPost] = useState({ title: '', content: '' });
-  const [newComment, setNewComment] = useState('');
-  const [activePostId, setActivePostId] = useState<string | null>(null);
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [messageText, setMessageText] = useState('');
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
-  const [showNewPostForm, setShowNewPostForm] = useState(false);
-
-  // Fetch posts on component mount and set up real-time subscriptions
+  const [replyingTo, setReplyingTo] = useState<Message | null>(null);
+  const scrollAreaRef = useRef<HTMLDivElement>(null);
+  
+  // User color mapping
+  const userColorMap = useRef(new Map<string, string>());
+  
+  // Get a consistent color for a user based on their ID
+  const getUserColor = (userId: string) => {
+    if (!userColorMap.current.has(userId)) {
+      const hashCode = userId.split('').reduce((acc, char) => {
+        return char.charCodeAt(0) + ((acc << 5) - acc);
+      }, 0);
+      const colorIndex = Math.abs(hashCode) % userColors.length;
+      userColorMap.current.set(userId, userColors[colorIndex]);
+    }
+    return userColorMap.current.get(userId) || "bg-primary";
+  };
+  
+  // Fetch messages on component mount and set up real-time subscriptions
   useEffect(() => {
-    fetchPosts();
+    fetchMessages();
     
-    // Set up real-time subscription for new posts and comments
-    const postsSubscription = supabase
-      .channel('forum_changes')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'forum_posts' }, () => {
-        fetchPosts();
-      })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'forum_comments' }, () => {
-        fetchPosts();
+    // Set up real-time subscription for new messages
+    const messagesSubscription = supabase
+      .channel('chat_changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'chat_messages' }, () => {
+        fetchMessages();
       })
       .subscribe();
 
     return () => {
-      postsSubscription.unsubscribe();
+      messagesSubscription.unsubscribe();
     };
   }, []);
 
-  // Function to fetch posts with comments
-  const fetchPosts = async () => {
+  // Function to fetch messages with profiles
+  const fetchMessages = async () => {
     try {
       setLoading(true);
       
-      const { data: postsData, error: postsError } = await supabase
-        .from('forum_posts')
+      const { data: messagesData, error: messagesError } = await supabase
+        .from('chat_messages')
         .select(`
           *,
-          user:profiles(full_name, avatar_url),
-          comments:forum_comments(
-            *,
-            user:profiles(full_name, avatar_url)
+          profile:profiles(full_name, avatar_url),
+          reply_to:chat_messages(
+            id,
+            content,
+            user_id,
+            profile:profiles(full_name, avatar_url)
           )
         `)
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: true });
 
-      if (postsError) throw postsError;
+      if (messagesError) throw messagesError;
       
-      setPosts(postsData || []);
+      setMessages(messagesData || []);
+      setTimeout(() => scrollToBottom(), 100);
     } catch (error) {
-      console.error('Error fetching posts:', error);
+      console.error('Error fetching messages:', error);
       toast({
         title: 'Error',
-        description: 'Failed to load forum posts',
+        description: 'Failed to load chat messages',
         variant: 'destructive',
       });
     } finally {
@@ -103,40 +123,42 @@ export default function Forum() {
     }
   };
 
-  // Function to create a new post
-  const handleCreatePost = async () => {
-    if (!newPost.title.trim() || !newPost.content.trim()) {
-      toast({
-        title: 'Error',
-        description: 'Please fill in all fields',
-        variant: 'destructive',
-      });
+  // Function to scroll to bottom of messages
+  const scrollToBottom = () => {
+    if (scrollAreaRef.current) {
+      const scrollContainer = scrollAreaRef.current.querySelector('[data-radix-scroll-area-viewport]');
+      if (scrollContainer) {
+        scrollContainer.scrollTop = scrollContainer.scrollHeight;
+      }
+    }
+  };
+
+  // Function to send a message
+  const handleSendMessage = async () => {
+    if (!messageText.trim() || !user) {
       return;
     }
 
     setSending(true);
     try {
-      const { error } = await supabase.from('forum_posts').insert([
+      const { error } = await supabase.from('chat_messages').insert([
         {
-          title: newPost.title,
-          content: newPost.content,
-          user_id: user?.id,
+          content: messageText.trim(),
+          user_id: user.id,
+          reply_to_id: replyingTo?.id || null,
         },
       ]);
 
       if (error) throw error;
 
-      setNewPost({ title: '', content: '' });
-      setShowNewPostForm(false);
-      toast({
-        title: 'Success',
-        description: 'Post created successfully',
-      });
+      setMessageText('');
+      setReplyingTo(null);
+      setTimeout(() => scrollToBottom(), 100);
     } catch (error) {
-      console.error('Error creating post:', error);
+      console.error('Error sending message:', error);
       toast({
         title: 'Error',
-        description: 'Failed to create post',
+        description: 'Failed to send message',
         variant: 'destructive',
       });
     } finally {
@@ -144,295 +166,172 @@ export default function Forum() {
     }
   };
 
-  // Function to add a comment to a post
-  const handleAddComment = async (postId: string) => {
-    if (!newComment.trim()) {
-      toast({
-        title: 'Error',
-        description: 'Please enter a comment',
-        variant: 'destructive',
-      });
-      return;
-    }
-
-    setSending(true);
-    try {
-      const { error } = await supabase.from('forum_comments').insert([
-        {
-          content: newComment,
-          post_id: postId,
-          user_id: user?.id,
-        },
-      ]);
-
-      if (error) throw error;
-
-      setNewComment('');
-      toast({
-        title: 'Success',
-        description: 'Comment added successfully',
-      });
-    } catch (error) {
-      console.error('Error adding comment:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to add comment',
-        variant: 'destructive',
-      });
-    } finally {
-      setSending(false);
+  // Handle enter key to send message
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handleSendMessage();
     }
   };
 
-  // Function to like a post
-  const handleLikePost = async (postId: string) => {
-    try {
-      // First check if post likes column exists
-      const { data: postData, error: postError } = await supabase
-        .from('forum_posts')
-        .select('likes')
-        .eq('id', postId)
-        .single();
-      
-      if (postError) throw postError;
-      
-      // Update likes count
-      const currentLikes = postData.likes || 0;
-      const { error } = await supabase
-        .from('forum_posts')
-        .update({ likes: currentLikes + 1 })
-        .eq('id', postId);
-        
-      if (error) throw error;
-      
-      // Refresh posts to show updated likes
-      fetchPosts();
-    } catch (error) {
-      console.error('Error liking post:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to like post',
-        variant: 'destructive',
-      });
+  // Get user initials for avatar
+  const getInitials = (message: Message) => {
+    if (message.profile?.full_name) {
+      return message.profile.full_name.split(' ')
+        .map(n => n[0])
+        .join('')
+        .toUpperCase();
     }
+    return 'U';
   };
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <Loader2 className="h-8 w-8 animate-spin" />
-      </div>
-    );
-  }
+  // Check if message is from current user
+  const isCurrentUser = (messageUserId: string) => {
+    return user?.id === messageUserId;
+  };
+
+  // Handle reply to message
+  const handleReply = (message: Message) => {
+    setReplyingTo(message);
+    // Focus on the text input
+    document.getElementById('message-input')?.focus();
+  };
+
+  // Cancel reply
+  const cancelReply = () => {
+    setReplyingTo(null);
+  };
 
   return (
-    <div className="container mx-auto px-3 py-4 max-w-2xl">
-      {/* Mobile-friendly header */}
-      <div className="mb-5">
-        <h1 className="text-2xl font-bold text-center mb-5">Forum</h1>
-        <Button 
-          onClick={() => setShowNewPostForm(!showNewPostForm)}
-          className="w-full flex items-center justify-center gap-2"
-          size="lg"
-        >
-          {showNewPostForm ? (
-            <>
-              <X className="h-5 w-5" />
-              <span>Cancel</span>
-            </>
+    <div className="container mx-auto px-3 py-4 max-w-3xl h-[calc(100vh-120px)]">
+      <div className="flex flex-col h-full border rounded-lg shadow-sm overflow-hidden">
+        {/* Header */}
+        <div className="flex-shrink-0 p-4 border-b bg-card">
+          <h1 className="text-xl font-bold">Chat</h1>
+          <p className="text-sm text-muted-foreground">Group chat with all members</p>
+        </div>
+        
+        {/* Messages */}
+        <ScrollArea className="flex-1 p-4" ref={scrollAreaRef}>
+          {loading ? (
+            <div className="flex justify-center p-8">
+              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            </div>
+          ) : messages.length > 0 ? (
+            <div className="space-y-4">
+              {messages.map((message) => (
+                <div 
+                  key={message.id} 
+                  className={`flex ${isCurrentUser(message.user_id) ? 'justify-end' : 'justify-start'}`}
+                >
+                  <div className={`flex flex-col max-w-[80%] ${isCurrentUser(message.user_id) ? 'items-end' : 'items-start'}`}>
+                    {/* Reply preview */}
+                    {message.reply_to && (
+                      <div 
+                        className={`text-xs px-2 py-1 rounded-t-md ${
+                          isCurrentUser(message.user_id) 
+                            ? 'bg-primary/20 text-primary-foreground/80' 
+                            : 'bg-muted/70 text-muted-foreground'
+                        }`}
+                      >
+                        <span className="font-medium">
+                          {message.reply_to.profile?.full_name || 'Unknown user'}:
+                        </span> {message.reply_to.content.length > 40 
+                          ? `${message.reply_to.content.substring(0, 40)}...` 
+                          : message.reply_to.content}
+                      </div>
+                    )}
+                    
+                    <div className={`flex items-start gap-2 ${isCurrentUser(message.user_id) ? 'flex-row-reverse' : 'flex-row'}`}>
+                      {!isCurrentUser(message.user_id) && (
+                        <Avatar className={`h-8 w-8 ${getUserColor(message.user_id)} text-white flex-shrink-0`}>
+                          <AvatarFallback>{getInitials(message)}</AvatarFallback>
+                          <AvatarImage src={message.profile?.avatar_url} />
+                        </Avatar>
+                      )}
+                      
+                      <div className="group">
+                        {!isCurrentUser(message.user_id) && (
+                          <div className="text-xs font-medium mb-1 ml-1">
+                            {message.profile?.full_name || 'Unknown user'}
+                          </div>
+                        )}
+                        
+                        <div className={`relative rounded-lg px-3 py-2 ${
+                          isCurrentUser(message.user_id) 
+                            ? 'bg-primary text-primary-foreground rounded-tr-none' 
+                            : 'bg-muted rounded-tl-none'
+                        }`}>
+                          <div className="text-sm whitespace-pre-wrap break-words">{message.content}</div>
+                          <div className="text-xs mt-1 opacity-70">
+                            {formatDistanceToNow(new Date(message.created_at), { addSuffix: true })}
+                          </div>
+                          
+                          {/* Reply button */}
+                          <button
+                            onClick={() => handleReply(message)}
+                            className="absolute -top-2 -right-2 p-1 rounded-full bg-background border shadow-sm opacity-0 group-hover:opacity-100 transition-opacity"
+                          >
+                            <Reply className="h-4 w-4" />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
           ) : (
-            <>
-              <PlusCircle className="h-5 w-5" />
-              <span>Create New Post</span>
-            </>
+            <div className="flex justify-center items-center h-full text-muted-foreground">
+              No messages yet. Start the conversation!
+            </div>
           )}
-        </Button>
-      </div>
-
-      {/* New Post Form - Mobile Optimized */}
-      {showNewPostForm && (
-        <Card className="p-4 mb-6 shadow-lg">
-          <h2 className="text-lg font-bold mb-4">Create New Post</h2>
-          <div className="space-y-4">
-            <div>
-              <Input
-                placeholder="Post Title"
-                value={newPost.title}
-                onChange={(e) => setNewPost({ ...newPost, title: e.target.value })}
-                className="text-base h-12"
-              />
+        </ScrollArea>
+        
+        {/* Reply preview */}
+        {replyingTo && (
+          <div className="flex items-center gap-2 p-2 bg-muted/30 border-t">
+            <div className="flex-1 text-sm text-muted-foreground">
+              <span className="font-medium">
+                Replying to {replyingTo.profile?.full_name || 'Unknown user'}:
+              </span> {replyingTo.content.length > 40 
+                ? `${replyingTo.content.substring(0, 40)}...` 
+                : replyingTo.content}
             </div>
-            <div>
-              <Textarea
-                placeholder="What's on your mind?"
-                value={newPost.content}
-                onChange={(e) => setNewPost({ ...newPost, content: e.target.value })}
-                className="min-h-[150px] text-base"
-              />
-            </div>
-            <Button
-              onClick={handleCreatePost}
-              disabled={sending}
-              className="w-full h-12 text-base"
+            <button
+              onClick={cancelReply}
+              className="p-1 hover:bg-muted rounded-full"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+        )}
+        
+        {/* Message input */}
+        <div className="flex-shrink-0 p-4 border-t bg-card">
+          <div className="flex gap-2">
+            <Textarea
+              id="message-input"
+              value={messageText}
+              onChange={(e) => setMessageText(e.target.value)}
+              onKeyDown={handleKeyDown}
+              placeholder={replyingTo ? `Reply to ${replyingTo.profile?.full_name || 'Unknown user'}...` : "Type a message..."}
+              className="min-h-[60px] resize-none"
+            />
+            <Button 
+              onClick={handleSendMessage} 
+              disabled={!messageText.trim() || sending}
+              size="icon"
+              className="self-end h-10 w-10"
             >
               {sending ? (
-                <>
-                  <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                  Creating...
-                </>
+                <Loader2 className="h-4 w-4 animate-spin" />
               ) : (
-                'Post'
+                <Send className="h-4 w-4" />
               )}
             </Button>
           </div>
-        </Card>
-      )}
-
-      {/* Empty state */}
-      {posts.length === 0 && !loading && (
-        <Card className="p-6 text-center">
-          <p className="text-lg text-muted-foreground mb-4">No posts yet</p>
-          <Button
-            onClick={() => setShowNewPostForm(true)}
-            className="mx-auto"
-          >
-            Create the first post
-          </Button>
-        </Card>
-      )}
-
-      {/* Posts List - Mobile Optimized */}
-      <div className="space-y-6">
-        {posts.map((post) => (
-          <Card key={post.id} className="overflow-hidden">
-            <div className="p-4">
-              {/* Post Header - Optimized for mobile */}
-              <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center gap-2">
-                  <Avatar className="h-9 w-9">
-                    <AvatarImage src={post.user.avatar_url} />
-                    <AvatarFallback>
-                      {post.user.full_name?.split(' ').map(n => n[0]).join('') || 'U'}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div>
-                    <p className="font-semibold text-sm line-clamp-1">
-                      {post.user.full_name}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      {formatDistanceToNow(new Date(post.created_at), { addSuffix: true })}
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              {/* Post Content - Mobile optimized */}
-              <div className="mb-4">
-                <h2 className="text-lg font-semibold mb-2 break-words">{post.title}</h2>
-                <p className="text-sm text-muted-foreground whitespace-pre-wrap break-words">
-                  {post.content.length > 200 && activePostId !== post.id
-                    ? `${post.content.substring(0, 200)}...`
-                    : post.content}
-                </p>
-                {post.content.length > 200 && activePostId !== post.id && (
-                  <Button 
-                    variant="link" 
-                    className="p-0 h-auto text-xs"
-                    onClick={() => setActivePostId(post.id)}
-                  >
-                    Read more
-                  </Button>
-                )}
-              </div>
-
-              {/* Post Actions - Mobile friendly */}
-              <div className="flex items-center justify-between border-t pt-3">
-                <div className="flex items-center gap-4">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => handleLikePost(post.id)}
-                    className="flex items-center gap-1 h-8 px-2"
-                  >
-                    <ThumbsUp className="h-4 w-4" />
-                    <span className="text-xs">{post.likes || 0}</span>
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setActivePostId(activePostId === post.id ? null : post.id)}
-                    className="flex items-center gap-1 h-8 px-2"
-                  >
-                    <MessageCircle className="h-4 w-4" />
-                    <span className="text-xs">{post.comments?.length || 0}</span>
-                  </Button>
-                </div>
-              </div>
-            </div>
-
-            {/* Comments Section - Mobile Optimized */}
-            {activePostId === post.id && (
-              <div className="border-t bg-muted/30">
-                <div className="p-4">
-                  <h3 className="text-sm font-medium mb-2">Comments ({post.comments?.length || 0})</h3>
-                  
-                  {/* Scrollable comment area */}
-                  {post.comments?.length > 0 ? (
-                    <div className="max-h-[300px] overflow-y-auto mb-4">
-                      <div className="space-y-4">
-                        {post.comments.map((comment) => (
-                          <div key={comment.id} className="flex gap-2">
-                            <Avatar className="h-7 w-7 flex-shrink-0">
-                              <AvatarImage src={comment.user.avatar_url} />
-                              <AvatarFallback>
-                                {comment.user.full_name?.split(' ').map(n => n[0]).join('') || 'U'}
-                              </AvatarFallback>
-                            </Avatar>
-                            <div className="flex-1">
-                              <div className="bg-background rounded-lg p-2">
-                                <p className="font-medium text-xs mb-1">{comment.user.full_name}</p>
-                                <p className="text-sm break-words">{comment.content}</p>
-                              </div>
-                              <p className="text-xs text-muted-foreground mt-1">
-                                {formatDistanceToNow(new Date(comment.created_at), { addSuffix: true })}
-                              </p>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  ) : (
-                    <p className="text-sm text-muted-foreground text-center py-4">
-                      No comments yet. Be the first to comment!
-                    </p>
-                  )}
-                  
-                  {/* Comment input - Mobile friendly */}
-                  <div className="flex gap-2">
-                    <Input
-                      placeholder="Write a comment..."
-                      value={newComment}
-                      onChange={(e) => setNewComment(e.target.value)}
-                      className="text-sm h-10"
-                    />
-                    <Button
-                      onClick={() => handleAddComment(post.id)}
-                      disabled={sending}
-                      size="icon"
-                      className="h-10 w-10 flex-shrink-0"
-                    >
-                      {sending ? (
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                      ) : (
-                        <Send className="h-4 w-4" />
-                      )}
-                    </Button>
-                  </div>
-                </div>
-              </div>
-            )}
-          </Card>
-        ))}
+        </div>
       </div>
     </div>
   );
