@@ -168,7 +168,7 @@ export default function Chat() {
         setLoading(false);
         return;
       }
-      
+
       // Extract all user IDs from messages (including those in replies)
       const userIds = [...new Set(messages.map(msg => msg.user_id))]; 
       
@@ -386,7 +386,7 @@ export default function Chat() {
     try {
       setLoading(true);
       const { data, error } = await supabase.auth.refreshSession();
-      
+
       if (error) {
         throw error;
       }
@@ -460,7 +460,7 @@ export default function Chat() {
         
         {/* Messages area - expanded to fill available space */}
         <ScrollArea className="flex-1 p-4" ref={scrollAreaRef}>
-          {loading ? (
+        {loading ? (
             <div className="flex justify-center items-center h-full">
               <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
             </div>
@@ -591,8 +591,8 @@ export default function Chat() {
                   <span>Someone is typing...</span>
                 </div>
               )}
-            </div>
-          ) : (
+          </div>
+        ) : (
             <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
               <p>No messages yet</p>
               <p className="text-sm">Be the first to send a message!</p>
@@ -651,7 +651,7 @@ export default function Chat() {
                     <Image className="h-4 w-4" />
                   </Button>
                 </div>
-              </div>
+            </div>
               <Button 
                 onClick={handleSendMessage} 
                 disabled={sending || !userReady || !messageText.trim()}

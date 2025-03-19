@@ -116,7 +116,7 @@ const LoginForm: React.FC = () => {
         setIsLoading(false);
         return;
       }
-      
+
       // Get user profile with department info in a single query
       const { data: profileData, error: profileError } = await supabase
         .from('profiles')
@@ -129,13 +129,13 @@ const LoginForm: React.FC = () => {
         `)
         .eq('id', data.user.id)
         .single();
-        
+      
       if (profileError) {
         console.error('Error fetching profile:', profileError);
         setIsLoading(false);
         return;
       }
-      
+
       const role = profileData?.role?.toLowerCase();
       const departmentCode = profileData?.departments?.department_code;
       const departmentId = profileData?.department_id;
@@ -144,8 +144,8 @@ const LoginForm: React.FC = () => {
       // Handle redirection based on approval status first
       if (approvalStatus === 'pending') {
         navigate('/auth/pending-approval', { replace: true });
-        return;
-      }
+          return;
+        }
       
       if (approvalStatus === 'rejected') {
         navigate('/auth/rejected-approval', { replace: true });
